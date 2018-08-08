@@ -88,3 +88,63 @@ plot(msf1, cols = rep(1, 3), lwd = 2, lty = 1:3, xlab = "Years since transplant"
 plot(msf2, cols = rep(1, 3), lwd = 2, lty = 1:3, xlab = "Years since transplant",
        ylab = "Proportional baseline hazards", legend.pos = c(2, 0.9))
 par(mfrow = c(1, 1))
+
+ # estimating the cumulative probability from the cumulative incidences 
+ # Aalen-Johansen-Estimator using probtrans
+pt <- probtrans(msf2, predt = 0) # predt specifies starting time s = 0 (= forward prediction)
+ # probtrans object are lists with predicted transitions probablities from state [i]
+
+tmat2 <- transMat(x = list(c(2, 4), c(3), c(), c())) # mnow seperating transition 1->3 and 2->3
+tmat2
+msf2$trans <- tmat2
+pt <- probtrans(msf2, predt = 0)
+summary(pt, from = 1)
+
+plot(pt, ord = c(2, 3, 4, 1), lwd = 2, xlab = "Years since transplant",
+     ylab = "Prediction probabilities", cex = 0.75, legend = c("Alive in remission, no PR",
+                                                                 "Alive in remission, PR", "Relapse or death after PR",
+                                                                 "Relapse or death without PR"))
+ # special plot method for probtrans objects (stacked  in order ord = c())
+
+ # fixed horizon: survival probablity knowing that person suvived until that moment
+
+
+ # competing risks
+data(aidssi)
+si <- aidssi # Just a shorter name
+head(si)
+table(si$status)
+
+tmat <- trans.comprisk(2, names = c("event-free", "AIDS", "SI"))
+tmat
+ # AFTER trans.comprisk, prepare long data frame
+si$stat1 <- as.numeric(si$status == 1) # TRUE -> 1
+si$stat2 <- as.numeric(si$status == 2)
+silong <- msprep(time = c(NA, "time", "time"), 
+                 status = c(NA, "stat1", "stat2"), 
+                 data = si, 
+                 keep = "ccr5", 
+                 trans = tmat) # a different transition matrix for competing causes
+silong <- expand.covs(silong, "ccr5") # dummy covariates (transition or cause-specific covariates) vor cox regression later
+silong[1:8, ] # if ww covariate is always 0
+
+ # survfit: . 
+ # Predicted curves from a coxph model have one row for each stratum in the Cox model fit and one column for each specified covariate set. 
+ # Curves from a multi-state model have one row for each stratum and a column for each state, 
+ # the strata correspond to predictors on the right hand side of the equation
+ #  --> net KAPLAN MAIER
+
+ # Cuminc: nonparametric Cumulative Incidence functions. Surv = failure-FREE Interval
+ # ?? Aalen-Johnson (probtrans in mstate) for competing risks?
+ci <- Cuminc(time = si$time, status = si$status)
+ci <- Cuminc(time = "time", status = "status", data = aidssi)
+head(ci)
+
+idx0 <- (ci$time < 13)
+plot(c(0, ci$time[idx0], 13), c(1, 1 - ci$CI.1[idx0], min(1 - ci$CI.1[idx0])), 
+       type = "s", xlim = c(0, 13), ylim = c(0, 1), 
+       xlab = "Years from HIV infection", ylab = "Probability", lwd = 2)
+lines(c(0, ci$time[idx0], 13), c(0, ci$CI.2[idx0], max(ci$CI.2[idx0])),
+        type = "s", lwd = 2)
+text(8, 0.77, adj = 0, "AIDS")
+text(8, 0.275, adj = 0, "SI")
