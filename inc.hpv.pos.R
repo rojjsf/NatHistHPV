@@ -1,3 +1,8 @@
+library(haven)
+library(Epi)
+library(dplyr)
+library(tidyr)
+
 ## prev. in 5y age groups
 pooled.data <- read_dta("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/prevalence data for R codes/HPVPREV_POOL_V29-1.dta")
 
@@ -489,63 +494,71 @@ prevalence[prevalence == 0] <- NA
 prevalence
 
 prev.model <- prevalence %>%
-  gather(., "entry.age", "prev", "P1":"P13") %>%
-  separate(Year, into = paste0("Year", c(0, ""))) 
-prev.model$entry.age <- as.numeric(factor(prev.model$entry.age, 
+  gather(., "age.grp", "prev", "P1":"P13") %>%
+  separate(Year, into = paste0("Year", c(0, ""))) %>%
+  select(-loc) # as locations differ to locations in incidence and mortality (country is important. which differ can be seen in int.corr.overview.xlsx)
+prev.model[is.na(prev.model$Year), "Year"] <- prev.model[is.na(prev.model$Year), "Year0"] # if study conducted in one year NA in Year. keep year as prevalence only correct when study ended
+prev.model[prev.model$cid == 20, "Year"] <- 2003 #For Italy must insert sga1yy = 2003 (true: 2002)
+fact.lbl <- c("(15,20]", "(20,25]", "(25,30]", "(30,35]", "(35,40]", "(40,45]", "(45,50]", "(50,55]",
+"(55,60]", "(60,65]", "(65,70]", "(70,75]", "(75,80]")
+prev.model$age.grp <- as.numeric(factor(prev.model$age.grp, 
                                           levels = c("P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"),
-                                          labels = c("(15,20]", "(20,25]", "(25,30]", "(30,35]", "(35,40]", "(40,45]", "(45,50]", "(50,55]",
-                                                     "(55,60]", "(60,65]", "(65,70]", "(70,75]", "(75,80]")))
+                                          labels = fact.lbl))
 prev.model$Year <- as.integer(prev.model$Year)
-str(prev.model)
+head(prev.model)
 
 #### mortality ####
 
 mortality.lexis <- mortality %>%
-  tidyr::gather(., "age.grp", "mort.rate", 3:15) %>%
+  tidyr::gather(., "mort.age", "mort.rate", 3:15) %>%
   mutate(lex.dur = 1) %>%
-  mutate(entry.age = as.numeric(factor(age.grp, levels = c("M15_19", "M20_24", "M25_29", "M30_34", "M35_39", "M40_44", "M45_49", "M50_54", 
-                                                           "M55_59", "M60_64", "M65_69", "M70_74", "M75_79"), labels = levels(cori$age.grp)))) %>%
-  mutate(death = mort.rate*10^(-5)) %>%
+  mutate(age.grp = as.numeric(factor(mort.age, levels = c("M15_19", "M20_24", "M25_29", "M30_34", "M35_39", "M40_44", "M45_49", "M50_54", 
+                                                           "M55_59", "M60_64", "M65_69", "M70_74", "M75_79"), labels = fact.lbl))) %>%
+  mutate(death = mort.rate*10^(-5)) %>% # for glm
   mutate(year = as.numeric(Year))
 
+head(mortality.lexis)
+
+#### 
 
 ####
 ####
 ####data frame to calculate inc in hpv positive women####
 hpv.inc <- inc.ci5.all %>%
-  tidyr::gather(., "age.grp", "inc.rate", 2:14) %>%
-  filter(loc == "Costa Rica") %>%
+  tidyr::gather(., "inc.age", "inc.rate", 2:14) %>%
   mutate(lex.dur = 1) %>%
-  mutate(entry.age = as.numeric(factor(age.grp, levels = c("R15_19", "R20_24", "R25_29", "R30_34", "R35_39", "R40_44", "R45_49", "R50_54", 
-                                                           "R55_59", "R60_64", "R65_69", "R70_74", "R75_79"), labels = levels(cori$age.grp)))) %>%
+  mutate(age.grp = as.numeric(factor(inc.age, levels = c("R15_19", "R20_24", "R25_29", "R30_34", "R35_39", "R40_44", "R45_49", "R50_54", 
+                                                           "R55_59", "R60_64", "R65_69", "R70_74", "R75_79"), labels = fact.lbl))) %>%
   mutate(icc = inc.rate*10^(-5)) %>%
   mutate(year = as.numeric(Year)) %>%
   select(-lex.dur, -year, -icc) %>%
-  full_join(., prev.model, by = c("cid", "entry.age", "loc", "Year")) %>%
-  select(-sgcentre, -Year0, - age.grp) %>%
-  full_join(., mortality.lexis, by = c("cid", "entry.age", "Year")) %>%
+  full_join(., prev.model, by = c("cid", "age.grp", "Year")) %>% # adding prevalence. Different loc vectors for inc and prev, so already removed from prevalence table
+  select(-sgcentre, -Year0) %>%
+  full_join(., mortality.lexis, by = c("cid", "age.grp", "Year")) %>% # adding mortality
   select(-Location, - lex.dur, - death, - year) %>% # Midperiod is for mortality
+  filter(!is.na(loc)) %>% # no loc when no incidence available (lost of doubled countries such as thailand!)
   mutate(ih = NA)
-# hpv.inc <- na.omit(hpv.inc, cols=c("inc.rate"), invert = FALSE)
-hpv.inc <- hpv.inc[order(hpv.inc$cid, hpv.inc$entry.age, hpv.inc$Year),]
+
+hpv.inc <- hpv.inc[order(hpv.inc$cid, hpv.inc$age.grp, hpv.inc$Year),] # correct order needed for function to work
 head(hpv.inc)
+# NA in loc and registry only when no incidence, so acceptible
 
 #### function to calculate ih (incidence in hpv positive women) ####
 ## does not work yet for general data frame
 for(i in 1:(nrow(hpv.inc)-1)){
   if(is.na(hpv.inc$prev[i+1])){
-  #if(hpv.inc$cid[i] == hpv.inc$cid[i+1]){ # same location (in location sorted by age and year, so no need for extra conditions that could include NAs)
-  hpv.inc$prev[i+1] <- 100* (hpv.inc$prev[i]/100 - hpv.inc$inc.rate[i]/10^5 - hpv.inc$mort[i]/10^5 * (hpv.inc$prev[i])/100) /
-    (1 - hpv.inc$inc.rate[i]/10^5 - hpv.inc$mort[i]/10^5)
+    if(((hpv.inc$Year[i] + 1) == hpv.inc$Year[i+1])){ # as sorted by location + age + year, year would be what changes first 
+  hpv.inc$prev[i+1] <- 100 * (hpv.inc$prev[i]/100 - hpv.inc$inc.rate[i]/10^5 - hpv.inc$mort.rate[i]/10^5 * (hpv.inc$prev[i])/100) /
+    (1 - hpv.inc$inc.rate[i]/10^5 - hpv.inc$mort.rate[i]/10^5)
   }
-  #}
+  }
 }
 
 for(i in 1:nrow(hpv.inc)){
     hpv.inc$ih[i] <- hpv.inc$inc.rate[i] / hpv.inc$prev[i] * 10^2 # as 10^(-5)/10^(-2) = 10^(-3). 
 }
 tail(hpv.inc)
-hpv.inc[hpv.inc$loc == "Costa Rica", ]
+hpv.inc[hpv.inc$cid == 5, ]
 
 head(hpv.inc)
-hpv.inc$Year[1] +1
+inc.ci5.all %>% filter(cid == 20)

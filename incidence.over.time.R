@@ -240,6 +240,7 @@ head(incXI)
 
 #### all available incidence rates from ci5 volume 9-11 #### 
 # matched with cid for locations in which hpv prevalence studies were conducted
+# intervals are filled with year under assumption that incidence constant over time interval.
 
 inc.ci5.all <- rbind(incVIII, incIX, incX, incXI)
 head(inc.ci5.all)

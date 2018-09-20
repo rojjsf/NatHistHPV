@@ -34,6 +34,7 @@ country.names <- c("Algeria",
                    "Pakistan", 
                    "Republic of Korea", # general mort available
                    "Thailand", # general mort available
+                   "Thailand",
                    "Viet Nam", 
                    # "Estonia", # general mort available | so far no indiv. prev data
                    # "Georgia", # general mort available| no inc data
@@ -41,7 +42,8 @@ country.names <- c("Algeria",
                    # "Lithuania", # general mort available | so far no indiv. prev data
                    "Netherlands", # general mort available
                    "Poland", # general mort available
-                   "Spain") # general mort available
+                   "Spain", # general mort available
+                   "Spain") # general mort available (twice as two incidence locations used)
                    # "United Kingdom", # general mort available | so far no indiv. prev data
                    # "Australia/New Zealand") # general mort available | so far no indiv. prev data
                    # "Fiji", # general mort available| no inc data
@@ -68,7 +70,8 @@ cid.mort <- c(1, #"Algeria",
               # "Nepal", | no inc data
               25, #"Pakistan", 
               12, #"Republic of Korea", # general mort available
-              16, #"Thailand", # general mort available
+              15, #"Thailand" (~Lampang), # general mort available
+              16, #"Thailand" (~Songkhla), # general mort available
               13, #"Viet Nam", 
               #"Estonia", # general mort available| so far no individual prevalence data
               # "Georgia", # general mort available| no inc data
@@ -76,7 +79,8 @@ cid.mort <- c(1, #"Algeria",
               #"Lithuania", # general mort available| so far no individual prevalence data
               19, #"Netherlands", # general mort available
               22, #"Poland", # general mort available
-              17) #"Spain", # general mort available
+              17, #"Spain", # general mort available
+              18) #"Spain", # general mort available
               #"United Kingdom", # general mort available| so far no individual prevalence data
               #"Australia/New Zealand")| so far no individual prevalence data
 info.mort <- data.frame("cid" = cid.mort, "Location" = country.names)
@@ -113,7 +117,7 @@ mortality$Time.Start <- as.numeric(mortality$Time.Start)
 mortality$Year <- mortality$Time.Start + mortality$add
 mortality <- mortality %>%
   select(-add, - Time.Start, - Time.End)
-
+head(mortality)
 
 
 ##### mortality and incidence rates per 100 000 per 5-year age group and country ####

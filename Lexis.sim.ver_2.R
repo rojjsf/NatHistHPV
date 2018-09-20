@@ -1,4 +1,9 @@
-#### I. Costa Rica ####
+library(haven)
+library(Epi)
+library(dplyr)
+library(tidyr)
+
+
 ## create semi-Lexis object with data from costa Rica
 pooled.data <- read_dta("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/prevalence data for R codes/HPVPREV_POOL_V29-1.dta")
 
@@ -7,21 +12,22 @@ Hrisk <- c("ahpv16", "ahpv18", "ahpv31","ahpv33","ahpv35","ahpv39","ahpv45","ahp
 
 Ldata <- pooled.data %>%
   mutate(hpvh = rowSums(pooled.data[, Hrisk])) %>%
-  filter(sgcentre == 12)  # location
+  filter(sgcentre == 19)  # location italy. For Italy must insert sga1yy = 2003 (true: 2002)
 Ldata <- Ldata %>%
   mutate(hpv = ifelse(hpvh > 0, 1, 0)) %>% 
   mutate(hpv = factor(hpv, levels = c(0, 1), labels = c("free", "hpv"))) %>%
   select(sgid = sgid, 
-         age = sga3,
+         entry.age = sga3,
          Year= sga1yy,
          hpv) %>%
-  mutate(cid = 6, # location
-         age.grp = (cut(age, seq(15, 80, 5))))%>%
+  mutate(cid = 5, # location 
+         #Year = 2003, #For Italy must insert sga1yy = 2003 (true: 2002)
+         age.grp = (cut(entry.age, seq(15, 80, 5))))%>%
   filter(is.na(.$hpv) == FALSE) 
 head(Ldata)
-
+hist(Ldata$entry.age)
 exit <- sample(1:3, size = dim(Ldata)[1], replace = TRUE)
-PreLex <- Lexis(entry = list(entry.age = as.numeric(age.grp),
+PreLex <- Lexis(entry = list(age = as.numeric(entry.age),
                             entry.year = as.numeric(Year)),
                entry.status = hpv,
                exit.status = factor(exit, labels = c("free", "hpv", "icc", "death"), levels = c(0, 1, 2, 3)),
@@ -32,12 +38,15 @@ head(PreLex)
 
 ## create rate models
 
-hpv.inc$loc
-Lrates <- hpv.inc %>%
-  filter(loc == "Colombia, Bucaramanga") %>% 
+# one row for each exact age in every year and every location needed. FAKE as not really continuous
+hpv.inc.long <- hpv.inc[rep(1:nrow(hpv.inc), each=5),]
+Lrates <- hpv.inc.long %>%
+  mutate(age = c(10 + hpv.inc.long$age.grp*5 + 0:4)) %>%
+  filter(cid == 5) %>%  # location
   mutate(lex.dur = 1) %>%
   mutate(year = as.numeric(Year))
-tail(Lrates)
+tail(Lrates) # one row for each year-age combination. Yearly switch in next age group possible
+
 ## models (does not work yet. possibility to adjust for different countries)
 #ir <- glm(icc ~ entry.age + year, family = poisson, offset = log(lex.dur), data = inc.ci5.lexis)
 #mr <- glm(death ~ entry.age + year, family = poisson, offset = lex.dur, data = mortality.lexis)
@@ -48,27 +57,36 @@ tail(Lrates)
 #(http://BendixCarstensen.com/Epi/simLexis.pdf)
 
 #mortality rate, same weather hpv pos or neg
+#mr <- function(x){
+#  for(a in 1:nrow(x)){
+#    id <- x[a, "age"] 
+#    y <- x[a, "entry.year"] #name of a time scale -> will be 
+#    if(x[a, "lex.Cst"] == "hpv"){
+#      return(Lrates[Lrates$age==id & Lrates$year == y, "mort.rate"]*(10^(-5)))
+#    }
+#    if(x[a, "lex.Cst"] == "free"){
+#      return(Lrates[Lrates$age==id & Lrates$year == y, "mort.rate"]*(10^(-5)))
+#    }
+#  }
+#}
+
+# same mortality rate for hpv and free, so only one output needed (to be verified)
 mr <- function(x){
   for(a in 1:nrow(x)){
-    id <- x[a, "entry.age"] 
+    id <- x[a, "age"] 
     y <- x[a, "entry.year"] #name of a time scale -> will be 
-    if(x[a, "lex.Cst"] == "hpv"){
-      return(Lrates[Lrates$entry.age==id & Lrates$year == y, "mort.rate"]*(10^(-5)))
-    }
-    if(x[a, "lex.Cst"] == "free"){
-      return(Lrates[Lrates$entry.age==id & Lrates$year == y, "mort.rate"]*(10^(-5)))
-    }
+    return(Lrates[Lrates$age==id & Lrates$year == y, "mort.rate"]*(10^(-5))) # two time scales!
   }
 }
 
 # incidence rates for hpv pos only
-# has to be adapted for hpv pos women only in denominator
+
 ir <- function(x){
   for(b in 1:nrow(x)){
     if(x[b, "lex.Cst"] == "hpv"){
-      id <- x[b, "entry.age"]
+      id <- x[b, "age"]
       y <- x[b, "entry.year"]
-      return(Lrates[Lrates$entry.age==id & Lrates$year == y, "ih"]*(10^(-5)))
+      return(Lrates[Lrates$age==id & Lrates$year == y, "ih"]*(10^(-5)))
     }
   }
 }
@@ -78,21 +96,21 @@ Tr <- list("hpv" = list("icc" = ir,
                         "death" = mr),
            "free" = list("death" = mr))
 
-hpvSim <- simLexis(Tr, PreLex, t.range = 20, N = 10)
+hpvSim <- simLexis(Tr, PreLex, t.range = 20, N = 1)
 summary(hpvSim)
-
+dim(PreLex)
 ## simulate cohort
 par(mfrow= c(1,1))
-nSt <- nState( subset(hpvSim, entry.age %in% 4),
-               at=seq(0, 19, 1), from=1995, time.scale="entry.year")
+nSt <- nState( subset(hpvSim, age %in% 20:30),
+               at=seq(0, 9, 1), from= 2003, time.scale="entry.year") # changing from year does NOT change probablities
 nSt <- nState(hpvSim,
-               at=seq(0, 19, 1), from=1993, time.scale="entry.year")
+               at=seq(0, 9, 1), from= 2003, time.scale="entry.year")
 nSt
 
 ## plot survival curves
-pp <- pState( nSt, perm=c(3, 2, 4, 1) ) # perm changes order of states (recalculaes percentages)
-#pp <- pState( nSt, perm=c(3, 2) ) cc risk for hpv positive only, given you are not dead 
-head( pp )
+pp <- pState( nSt, perm=c(3, 2, 4) ) # perm changes order of states (recalculaes percentages)
+pp <- pState( nSt, perm=c(3, 2) ) #cc risk for hpv positive only, given you are not dead 
+tail( pp )
 plot( pp, col = c("darkred", "pink", "darkblue", "lightblue" ))
 mtext("Costa Rica HPV Study 50-54y old (N=10), incidence rates adjusted", side = 3, line = 3)
 mtext("HPV neg in 1993/1994, event free", col = "lightblue", side = 3, line = 2, adj = 0)
