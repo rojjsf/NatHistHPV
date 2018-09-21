@@ -3,6 +3,9 @@ library(Epi)
 library(dplyr)
 library(tidyr)
 
+##
+###run int.corr.inc.pre.vers_3.all.data first (else no inc)
+##
 ## prev. in 5y age groups
 pooled.data <- read_dta("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/prevalence data for R codes/HPVPREV_POOL_V29-1.dta")
 
@@ -34,12 +37,13 @@ pooled.hrisk <- pooled.hrisk %>%
   mutate(hpvsino = factor(hpvsino, levels = c(0,1), labels = c("neg", "pos")))
 
 ### gather in one table #
+## loc must be from incidence.over.time
 m <- matrix(data = NA, nrow = length(loc), ncol = length(levels(pooled.hrisk$age.grp)) + 5)
 prevalence <- data.frame(m)
 colnames(prevalence) <- c("cid", "sgcentre", "loc", "Year", "n", levels(pooled.hrisk$age.grp))
-prevalence$loc <- inc$loc
-prevalence$cid <- inc$cid
-prevalence$sgcentre <- inc$sgcentre
+prevalence$loc <- loc
+prevalence$cid <- cid
+
 
 
 
@@ -76,15 +80,10 @@ uga.data <- read_dta("file:///I:/Projects/International Correlation of HPV and C
 
 uga.hrisk <- uga.data[, c("HPVNUM", "AGE", "select_paper_baseline", "h16", "h18", "h31","h33","h35","h39","h45","h51","h52","h56","h58","h59","h68_73", "h82")]
 # select_paper_baseline =1 means women included. total n = 1275 (see variable-description.doc)
-head(uga.hrisk) 
-
 includedwomen <-  which(uga.hrisk$select_paper_baseline == 1)
 uga.hrisk <- uga.hrisk[includedwomen, ]
-dim(uga.hrisk)
-
 uga.hrisk$age.grp <- cut(uga.hrisk$AGE, seq(15, 80, 5), right = FALSE)
 
-str(uga.hrisk) # hpv pos/neg coded as numeric 1/0 
 uga.hrisk[is.na(uga.hrisk)] <- 0 # mathmatical functions do not work with NA so transform to 0
 uga.hrisk <- uga.hrisk %>%
   mutate(hpvpos = rowSums(uga.hrisk[,  c("h16", "h18", "h31","h33","h35","h39","h45","h51","h52","h56","h58","h59","h68_73", "h82")])) %>% # number of different hpv infections
@@ -493,17 +492,19 @@ prevalence[prevalence == "NaN"] <- NA
 prevalence[prevalence == 0] <- NA
 prevalence
 
+fact.lbl <- c("(15,20]", "(20,25]", "(25,30]", "(30,35]", "(35,40]", "(40,45]", "(45,50]", "(50,55]",
+              "(55,60]", "(60,65]", "(65,70]", "(70,75]", "(75,80]")
+
 prev.model <- prevalence %>%
   gather(., "age.grp", "prev", "P1":"P13") %>%
   separate(Year, into = paste0("Year", c(0, ""))) %>%
   select(-loc) # as locations differ to locations in incidence and mortality (country is important. which differ can be seen in int.corr.overview.xlsx)
 prev.model[is.na(prev.model$Year), "Year"] <- prev.model[is.na(prev.model$Year), "Year0"] # if study conducted in one year NA in Year. keep year as prevalence only correct when study ended
 prev.model[prev.model$cid == 20, "Year"] <- 2003 #For Italy must insert sga1yy = 2003 (true: 2002)
-fact.lbl <- c("(15,20]", "(20,25]", "(25,30]", "(30,35]", "(35,40]", "(40,45]", "(45,50]", "(50,55]",
-"(55,60]", "(60,65]", "(65,70]", "(70,75]", "(75,80]")
-prev.model$age.grp <- as.numeric(factor(prev.model$age.grp, 
+
+prev.model$age.grp <- factor(prev.model$age.grp, 
                                           levels = c("P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"),
-                                          labels = fact.lbl))
+                                          labels = fact.lbl)
 prev.model$Year <- as.numeric(prev.model$Year)
 str(prev.model)
 
@@ -512,12 +513,13 @@ str(prev.model)
 mortality.lexis <- mortality %>%
   tidyr::gather(., "mort.age", "mort.rate", 3:15) %>%
   mutate(lex.dur = 1) %>%
-  mutate(age.grp = as.numeric(factor(mort.age, levels = c("M15_19", "M20_24", "M25_29", "M30_34", "M35_39", "M40_44", "M45_49", "M50_54", 
-                                                           "M55_59", "M60_64", "M65_69", "M70_74", "M75_79"), labels = fact.lbl))) %>%
-  mutate(death = mort.rate*10^(-5)) %>% # for glm
-  mutate(year = as.numeric(Year))
+  mutate(age.grp = factor(mort.age, levels = c("M15_19", "M20_24", "M25_29", "M30_34", "M35_39", "M40_44", "M45_49", "M50_54", 
+                                                           "M55_59", "M60_64", "M65_69", "M70_74", "M75_79"), labels = fact.lbl)) 
+#%>%
+#  mutate(death = mort.rate*10^(-5)) %>% # for glm
 
-head(mortality.lexis)
+
+str(mortality.lexis)
 
 #### 
 
@@ -527,15 +529,14 @@ head(mortality.lexis)
 hpv.inc <- inc.ci5.all %>%
   tidyr::gather(., "inc.age", "inc.rate", 2:14) %>%
   mutate(lex.dur = 1) %>%
-  mutate(age.grp = as.numeric(factor(inc.age, levels = c("R15_19", "R20_24", "R25_29", "R30_34", "R35_39", "R40_44", "R45_49", "R50_54", 
-                                                           "R55_59", "R60_64", "R65_69", "R70_74", "R75_79"), labels = fact.lbl))) %>%
+  mutate(age.grp = factor(inc.age, levels = c("R15_19", "R20_24", "R25_29", "R30_34", "R35_39", "R40_44", "R45_49", "R50_54", 
+                                                           "R55_59", "R60_64", "R65_69", "R70_74", "R75_79"), labels = fact.lbl)) %>%
   mutate(icc = inc.rate*10^(-5)) %>%
-  mutate(year = as.numeric(Year)) %>%
-  select(-lex.dur, -year, -icc) %>%
+  select(-lex.dur, -icc) %>%
   full_join(., prev.model, by = c("cid", "age.grp", "Year")) %>% # adding prevalence. Different loc vectors for inc and prev, so already removed from prevalence table
   select(-sgcentre, -Year0) %>%
   full_join(., mortality.lexis, by = c("cid", "age.grp", "Year")) %>% # adding mortality
-  select(-Location, - lex.dur, - death, - year) %>% # Midperiod is for mortality
+  select(-Location, - lex.dur) %>% # Midperiod is for mortality
   filter(!is.na(loc)) %>% # no loc when no incidence available (lost of doubled countries such as thailand!)
   mutate(ih = NA)
 
@@ -558,7 +559,7 @@ for(i in 1:nrow(hpv.inc)){
     hpv.inc$ih[i] <- hpv.inc$inc.rate[i] / hpv.inc$prev[i] * 10^2 # as 10^(-5)/10^(-2) = 10^(-3). 
 }
 tail(hpv.inc)
-hpv.inc[hpv.inc$cid == 5, ]
+hpv.inc[hpv.inc$cid == 9, ]
 
 head(hpv.inc)
 inc.ci5.all %>% filter(cid == 20)
