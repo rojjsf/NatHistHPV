@@ -504,8 +504,8 @@ fact.lbl <- c("(15,20]", "(20,25]", "(25,30]", "(30,35]", "(35,40]", "(40,45]", 
 prev.model$age.grp <- as.numeric(factor(prev.model$age.grp, 
                                           levels = c("P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"),
                                           labels = fact.lbl))
-prev.model$Year <- as.integer(prev.model$Year)
-head(prev.model)
+prev.model$Year <- as.numeric(prev.model$Year)
+str(prev.model)
 
 #### mortality ####
 
