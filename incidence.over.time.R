@@ -75,7 +75,7 @@ files.IX <- c(NA, # IRR Algeria, S?tif
             "57240199.csv", #	Spain, Tarragona (1998-2001)
             "57241099.csv", #	Spain, Girona (1998-2002)
             NA, # Chile, Region of Antofagasta  (NO data for chile, prevalence study in 2001 - very close to 2002)
-            NA, # IRR Italy, Turin 
+            "53800899.csv", # IRR Italy, Turin 
             "55280099.csv", #	The Netherlands (1998-2002)  
             NA,	# IRR Pakistan, South Karachi (1998-2002) 
             NA) # IRR Poland, Poznan 
@@ -94,7 +94,7 @@ REG.IX <- c(NA, # IRR Algeria, S?tif
               57240199, #	Spain, Tarragona (1998-2001)
               57241099, #	Spain, Girona (1998-2002)
               NA, # Chile, Region of Antofagasta  (NO data for chile, prevalence study in 2001 - very close to 2002)
-              NA, # IRR Italy, Turin 
+              53800899, # Italy, Turin 
               55280099, #	The Netherlands (1998-2002) 
               NA, # IRR Pakistan (No data)
               NA) # IRR Poland, Poznan 
@@ -262,5 +262,6 @@ head(inc.ci5.all)
 risk.rates <- full_join(inc.ci5.all, mortality, by = c("Year", "cid"))
 head(risk.rates)
 risk.rates[(risk.rates$Location == "Colombia"), ]
+
 
 

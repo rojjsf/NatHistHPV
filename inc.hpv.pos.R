@@ -76,8 +76,8 @@ prevalence[prevalence$cid == 1, "Year"] <- "2007-2008"
 #### I. uganda #### 
 ## extra script as not in pooled data. Not population wide, only  < 25y ##
 
-uga.data <- read_dta("file:///I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/prevalence data for R codes/Uganda data/girls-baseline-part-quest-clin-lab-sample-hpvres-fup-cyto-updbasefupoct2007-subtypes.dta")
-
+#uga.data <- read_dta("file:///I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/prevalence data for R codes/Uganda data/girls-baseline-part-quest-clin-lab-sample-hpvres-fup-cyto-updbasefupoct2007-subtypes.dta")
+uga.data <- read_dta("C:/Users/schultefrohlinder/Documents/R/NatHistHPV/data sets/girls-baseline-part-quest-clin-lab-sample-hpvres-fup-cyto-updbasefupoct2007-subtypes.dta")
 uga.hrisk <- uga.data[, c("HPVNUM", "AGE", "select_paper_baseline", "h16", "h18", "h31","h33","h35","h39","h45","h51","h52","h56","h58","h59","h68_73", "h82")]
 # select_paper_baseline =1 means women included. total n = 1275 (see variable-description.doc)
 includedwomen <-  which(uga.hrisk$select_paper_baseline == 1)
@@ -500,12 +500,13 @@ prev.model <- prevalence %>%
   separate(Year, into = paste0("Year", c(0, ""))) %>%
   select(-loc) # as locations differ to locations in incidence and mortality (country is important. which differ can be seen in int.corr.overview.xlsx)
 prev.model[is.na(prev.model$Year), "Year"] <- prev.model[is.na(prev.model$Year), "Year0"] # if study conducted in one year NA in Year. keep year as prevalence only correct when study ended
-prev.model[prev.model$cid == 20, "Year"] <- 2003 #For Italy must insert sga1yy = 2003 (true: 2002)
+#prev.model[prev.model$cid == 20, "Year"] <- 2003 #For Italy must insert sga1yy = 2003 (true: 2002)
 
 prev.model$age.grp <- factor(prev.model$age.grp, 
                                           levels = c("P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"),
                                           labels = fact.lbl)
 prev.model$Year <- as.numeric(prev.model$Year)
+prev.model$Year[prev.model$cid == 4 ] <- 2003 # chile. as nor inc rates before 2003
 str(prev.model)
 
 #### mortality ####
@@ -559,7 +560,7 @@ for(i in 1:nrow(hpv.inc)){
     hpv.inc$ih[i] <- hpv.inc$inc.rate[i] / hpv.inc$prev[i] * 10^2 # as 10^(-5)/10^(-2) = 10^(-3). 
 }
 tail(hpv.inc)
-hpv.inc[hpv.inc$cid == 9, ]
+hpv.inc[hpv.inc$cid == 4, ]
 
 head(hpv.inc)
-inc.ci5.all %>% filter(cid == 20)
+hpv.inc %>% filter(cid == 20)
