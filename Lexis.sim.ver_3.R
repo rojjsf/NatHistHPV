@@ -138,3 +138,7 @@ pp <- pState( nSt, perm=c(3, 4, 2, 1) ) # perm changes order of states (recalcul
 tail( pp )
 plot( pp, col = c("black", "grey", "white", "white" ), ylim = c(0, 0.2))
 mtext(stringr::str_c("Costa Rica ", mina, "-", maxa, "y old, cumProb(ICC) & cumProb(death), poisson"), side = 3, line = 3)
+pp3 <- pState( nSt, perm=c(3, 2) ) #cc risk for hpv positive only, given you are not dead 
+tail( pp3 )
+plot( pp3, col = c("black", "white"), ylim = c(0, 0.5))
+mtext(stringr::str_c("Costa Rica ", mina, "-", maxa, "y old, cumProb(ICC|no death & HPV+ in 1994), linear Poisson"), side = 3, line = 2)

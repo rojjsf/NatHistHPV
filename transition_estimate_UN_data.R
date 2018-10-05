@@ -51,7 +51,10 @@ pry$prY[pry$cid %in% c(8, 9, 13, 3, 17, 18, 4, 20, 22)] <- c(2005, 2004, 1997, 1
 # data frame Dpop: full data on population ####
 Dpop <- Npop %>%
   right_join(., inc.long, by = c("cid", "Age", "Year", "Location"))
-pry$cid <- as.numeric(pry$cid)
+ # pry$cid <- as.character(pry$cid)
+Dpop$cid <- as.factor(Dpop$cid)
+prev.model$cid <- as.factor(prev.model$cid)
+mortality.lexis$cid <- as.factor(mortality.lexis$cid) # so that order of cid in pry not changed
 Dpop <- Dpop %>%
   left_join(., prev.model, by = c("cid", "age.grp", "Year")) %>% # adding prevalence. Different loc vectors for inc and prev, so already removed from prevalence table
   select(c(-sgcentre, -Year0, - AgeGrp, -inc.age))%>%
@@ -61,7 +64,6 @@ Dpop <- Dpop %>%
   select(- lex.dur, - mort.age, - Time, - MidPeriod) %>%
   full_join(., pry, by = "cid") 
 Dpop <- Dpop[order(Dpop$cid, Dpop$Year, Dpop$Age),] 
-head(Dpop)
 
 ### function: calculate Nicc, Npos, prev ####
 if(is.na(Dpop$Age)){
@@ -81,17 +83,19 @@ for(i in 1:(nrow(Dpop))){
     y <- Dpop$Year[i]
     loc <- Dpop$cid[i]
     Dpop$Npos[Dpop$Age == (a+1) & Dpop$Year == (y+1) & Dpop$cid == loc] <- round(Dpop$Npos[i] - Dpop$Npos[i]*Dpop$mort.rate[i]*10^(-5) - Dpop$Nicc[i], 1)
-    Dpop$prev[Dpop$Age == (a+1) & Dpop$Year == (y+1) & Dpop$cid == loc] <- round(Dpop$Npos[i] *100 / Dpop$PopFemale[i], 2)
+    #Dpop$prev[Dpop$Age == (a+1) & Dpop$Year == (y+1) & Dpop$cid == loc] <- round(Dpop$Npos[i] *100 / Dpop$PopFemale[i], 2)
   }
 }
 
-Dpop$cid <- as.factor(Dpop$cid)
-Dpop[Dpop$Location == "Costa Rica" & Dpop$Year == 2006,]
+#Dpop$cid <- as.factor(Dpop$cid)
+#Dpop[Dpop$Location == "India" & Dpop$Year == 2006,]
+
+
 #### data frame Dp: select HPV positive women cohort by age, year, location ####
  # select age group
  # this part is copied into Lexis_sim.ver_3.R
-mina <- 15
-maxa <- 80
+mina <- 25
+maxa <- 30
 Dp <- data.frame(matrix(nrow = 0, ncol = 18)) # Dp = Data population (as nested in of Dpop)
 colnames(Dp) <- colnames(Dpop)
 
@@ -110,15 +114,14 @@ for(j in pry$cid){
 Dp <- Dp %>%
   mutate(YsncS = as.numeric(Dp$Year) - as.numeric(Dp$prY)) 
 
-
 #data frame DpC: cumulative rates for full cohort per country, year (not over full time period) ####
  # Sum all cases and women of all ages (in previously selected age group) in each Year and country (location, cid)
 DpC <- Dp %>%
   ungroup() %>%
-  group_by(YsncS, Location, cid) %>% 
-  summarise(Npos = sum(Npos), Nicc = sum(Nicc)) %>%
-  filter(Location != "Viet Nam" & Location != "Uganda" & cid != 17 & cid != 18) # Spain wierd(???), Ugande <25y, Viet Nam time gap inc 1998-2003
-# DpC[DpC$Location == "Algeria" & DpC$YsncS == 0, 4] <- 0.01 # ?? if left to be 0, Error: no valid set of coefficients has been found: please supply starting values
+  group_by(YsncS, cid, Location) %>% 
+  summarise(Npos = sum(Npos), Nicc = sum(Nicc)) #%>%
+  #filter(Location != "Viet Nam" & Location != "#Uganda" & cid != 17) #& cid != 18 Spain VERY HIGH (???), Ugande <25y, Viet Nam time gap inc 1998-2003
+#DpC[DpC$Location == "Algeria" & DpC$YsncS == 0, 4] <- 0.01 # ?? if left to be 0, Error: no valid set of coefficients has been found: please supply starting values
 head(DpC) 
 DpC[DpC$cid == 15, "Location"] <- "Thailand.L"
 DpC[DpC$cid == 16, "Location"] <- "Thailand.S"
@@ -127,7 +130,7 @@ DpC$Location <- as.factor(DpC$Location)
 #### Model transition rates hpv+ cohort all locations ####
  # poisson model to determine overall progression rate from former-hpv-positive group to ICC
 #yM <- glm(Nicc*100000/Npos ~ YsncS + Location +  Location*YsncS, family = poisson(link = identity), weights = Npos, data = DpC)
-yM <- glm(Nicc*100000/Npos ~ YsncS + Location -1, family = poisson(link = identity), weights = Npos, data = DpC) # let rate vary over time
+yM <- glm(Nicc*100000/Npos ~ YsncS + Location -1 , family = poisson(link = identity), weights = Npos, data = DpC) # let rate vary over time
 summary(yM)
 ci.lin(yM)
  # correlation test
@@ -136,24 +139,33 @@ cor.test(x = DpC$YsncS, y = (DpC$Nicc*100000/DpC$Npos),
          method = "spearman", 
          exact = FALSE)
  # plot
+col <- c('#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#67001f', '#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#003c30','#b15928', '#1a1a1a')
 ggplot(DpC, aes(x = YsncS, y = Nicc*100000/Npos)) + 
   geom_point(aes(color = Location)) + 
   geom_line(aes(color = Location)) +
+  scale_color_manual(values = col) +
   ggtitle(stringr::str_c("Yearly ICC Incidence Rate in birth cohort of women ", mina, "-", maxa, "y and HPV + at study entry")) +
   ylab("ICC incidence rate per 100 000") +
   xlab("Years since Prevalence Study") +
-  theme_bw() +
-  geom_abline(aes(intercept = sum(ci.lin(yM)[2:length(levels(DpC$Location))])/length(levels(DpC$Location)), slope = ci.lin(yM)[1]))
+  theme_bw() 
+  #geom_abline(aes(intercept = sum(ci.lin(yM)[2:length(levels(DpC$Location))])/length(levels(DpC$Location)), slope = ci.lin(yM)[1]))
 # can I take intercept as average of all intercepts???
+
+
+
+
 
 #### Model incidence rates full cohort ####
  #####  no allowed to take sum of rates!!!!
+# prevalence$cid <- as.factor(prevalence$cid)
+Dp$cid <- as.factor(Dp$cid)
 prevalence$cid <- as.factor(prevalence$cid)
+mortality.lexis$cid <- as.factor(mortality.lexis$cid) # so that order of cid in pry not changed
 DpCall <- Dp %>%
   ungroup() %>%
   group_by(YsncS, Location, cid) %>% 
   summarise(Nicc = sum(Nicc), Npop = sum(PopFemale)) %>% 
-  filter(Location != "Viet Nam" & Location != "Spain" & Location != "Uganda")  %>%
+  filter(Location != "Viet Nam" & Location != "Uganda")  %>% # Location != "Spain" &
   mutate(Rate = Nicc*100000/Npop) %>%
   full_join(., prevalence, by = "cid") %>%
   select(-sgcentre, - loc) %>%
@@ -170,14 +182,15 @@ cor.test(x = DpCall$Nicc * 10^5/DpCall$Npop, y = (DpCall$YsncS),
 str(DpCall)
 # poisson model to determine overall progression rate from former-hpv-positive group to ICC
  # adjusting for initial prevalence in age group instead of trying to calculate transition rate (???)
-yMall <- glm(Nicc * 10^5/Npop ~ P3 + YsncS + Location + YsncS*Location + YsncS*P3 -1, family = poisson(link = identity), weights = Npop, data = DpCall)
-yMall <- glm(Nicc * 10^5/Npop ~  YsncS + P3 + Year -1, family = poisson(link = identity), data = DpCall)
+yMall <- glm(Nicc * 10^5/Npop ~ P3 + YsncS + Location + YsncS*Location-1, family = poisson(link = identity), weights = Npop, data = DpCall)
+yMall <- glm(Nicc*10^5/Npop ~  YsncS + P3 + Year +YsncS*P3, family = poisson(link = identity), data = DpCall)
 summary(yMall)
 ci.lin(yMall)
 
 ggplot(DpCall, aes(x = YsncS, y = Nicc * 10^5/Npop )) + 
   geom_point(aes(color = Location)) + 
   geom_line(aes(color = Location)) +
+  scale_color_manual(values = col) +
   ggtitle(stringr::str_c("Yearly ICC Incidence Rate in birth cohort of women ", mina, "-", maxa, "y at study entry")) +
   ylab("ICC incidence rate per 100 000") +
   xlab("Years since Prevalence Study") +
