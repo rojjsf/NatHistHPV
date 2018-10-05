@@ -102,7 +102,7 @@ mortality <- life.table %>%
 # mx: Central death rate, nmx, for the age interval (x, x+n)
 # mx100: annual deaths per 100 000 persons (in life table mx is per hypothetical person)
 
-mortality <- merge(mortality, info.mort, by = "Location")
+mortality <- merge(mortality, info.mort, by = "Location", all = TRUE)
 colnames(mortality) <- c("Location", "Time", "Midperiod", "M15_19", "M20_24", "M25_29", "M30_34", "M35_39", "M40_44", "M45_49", 
                          "M50_54", "M55_59", "M60_64", "M65_69", "M70_74", "M75_79", "cid")
 
@@ -118,7 +118,6 @@ mortality$Year <- mortality$Time.Start + mortality$add
 mortality <- mortality %>%
   select(-add, - Time.Start, - Time.End)
 head(mortality)
-
 
 ##### mortality and incidence rates per 100 000 per 5-year age group and country ####
 # inc.ci5.all from incidence.over.time.R

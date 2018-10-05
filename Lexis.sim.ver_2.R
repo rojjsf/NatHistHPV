@@ -22,7 +22,7 @@ Hrisk <- c("ahpv16", "ahpv18", "ahpv31","ahpv33","ahpv35","ahpv39","ahpv45","ahp
   sg <- 19 # codebook_pool_v1.doc
   st <- 1994 # int.corr.overview.xlsx /or/ max(Ldata$sga1yy)
   mina <- 25 # begin age group
-  maxa <- 30 # max age group
+  maxa <- 35 # max age group
   
   Ldata <- pooled.data %>%
     mutate(hpvh = rowSums(pooled.data[, Hrisk], na.rm = TRUE)) %>%
@@ -69,7 +69,7 @@ Hrisk <- c("ahpv16", "ahpv18", "ahpv31","ahpv33","ahpv35","ahpv39","ahpv45","ahp
   if(is.na(Lrates$ih)){
   Lrates <- Lrates[-which(is.na(Lrates$ih)), ] 
   }
-  head(Lrates) 
+  tail(Lrates) 
   
   ## Tr as a function that takes a Lexis object as argument 
   # and returns average rates for each record in the same units as lex.dur 
@@ -99,7 +99,7 @@ Hrisk <- c("ahpv16", "ahpv18", "ahpv31","ahpv33","ahpv35","ahpv39","ahpv45","ahp
              "free" = list("death" = mr))
   
   ## Lexis simulation - only for one country
-  hpvSim <- simLexis(Tr, PreLex, t.range = 20, N = 50)
+  hpvSim <- simLexis(Tr, PreLex, t.range = 20, N = 20)
   summary(hpvSim)
   
   ## simulate cohort
@@ -122,9 +122,9 @@ Hrisk <- c("ahpv16", "ahpv18", "ahpv31","ahpv33","ahpv35","ahpv39","ahpv45","ahp
   tail( pp3 )
   par(mfrow = c(1,2))
   plot( pp, col = c("black", "grey", "white", "white" ), ylim = c(0, 0.2))
-  mtext("Costa Rica 30-35y old, cumProb(ICC) & cumProb(death)", side = 3, line = 1)
+  mtext(stringr::str_c("Costa Rica ", mina, "-", maxa, "y old, cumProb(ICC) & cumProb(death)"), side = 3, line = 3)
   plot( pp2, col = c("black", "white", "white"), ylim = c(0, 0.3))
-  mtext("Costa Rica 25-30y old, cumProb(ICC|no death)", side = 3, line = 1)
+  mtext(stringr::str_c("Costa Rica ", mina, "-", maxa, "y old, cumProb(ICC|no death)"), side = 3, line = 1)
   plot( pp3, col = c("black", "white"), ylim = c(0, 0.3))
   mtext("Costa Rica 25-30y old, cumProb(ICC|no death & HPV+ in 1994)", side = 3, line = 1)
 mtext("Costa Rica 25-30y old", side = 3, line = 1)

@@ -4,8 +4,121 @@ library(dplyr)
 library(tidyr)
 
 ##
-###run int.corr.inc.pre.vers_3.all.data first (else no inc)
-##
+###int.corr.inc.pre.vers_3.all.data first
+### locations from registry.txt
+loc <- c("Algeria, Setif", # new
+         "Uganda, Kyadondo County", # new
+         "Costa Rica", # new
+         "Colombia, Bucaramanga", # update
+         "China, Shenyang", # new
+         "India, Dindigul, Ambilikkai", # update
+         "Iran (Islamic Republic of), Golestan Province", # new
+         "Republic of Korea, Busan", # update
+         "Viet Nam, Ho Chi Minh City", # update
+         "Thailand, Lampang", # update
+         "Argentina, Entre Rios Province", # new
+         "Thailand, Songkhla", # update
+         "Spain, Tarragona", # update (in former as Barcelona)
+         "Spain, Girona", # -"-
+         "Chile, Region of Antofagasta", # new
+         "Italy, Turin", # update
+         "The Netherlands", # update
+         "Poland, Poznan")  # update
+# "*Viet Nam, Hanoi", # same. in inc3 (added further down. kept sepereate as inc from ci5_9)
+# "Pakistan, South Karachi")  # new(old incidence). in inc3
+# countries included 2008 but now no incidences found: hanoi(Vietnam), Nigeria
+# countries with iarc data but no incidence data: include with estimated incidences?
+
+
+
+# cid = centre id, assigned by Rosa in order to idntify all matching incidences and prevalences, even from non-IARC data
+cid <- c(1,  2,  5,  6,  8,  9, 10, 12, 13, 15,  3, 16, 17, 18,  4, 20, 19, 22)
+# cid <- c(1,  2,  6,  8,  9, 10, 12, 13, 15,  3, 16, 17, 18,  4, 20, 19, 22) # without costa rica
+
+
+REG <- c(101200199, # *Algeria, S?tif (2008-2011)
+         180000299, # *Uganda, Kyadondo County (2008-2012)
+         218800099, #  Costa Rica (2008-2011)
+         217000299, # Colombia, Bucaramanga (2008-2012)
+         415608399, # China, Shenyang (2008-2012)
+         435601199, # *India, Dindigul, Ambilikkai (2008-2012)
+         436400399, # Iran (Islamic Republic of), Golestan Province (2008-2011)
+         441000299, # Republic of Korea, Busan (2008-2012)
+         470400299, # *Viet Nam, Ho Chi Minh City (2009-2012)
+         476400599, # Thailand, Lampang (2008-2012)
+         203200599, # Argentina, Entre Rios Province (2008-2011)
+         476400499, # Thailand, Songkhla (2008-2012)
+         572400199, # Spain, Tarragona (2008-2012)
+         572401099, # Spain, Girona (2008-2012)
+         215200399, # *Chile, Region of Antofagasta (2008-2010)
+         538000899, # Italy, Turin (2008-2012)
+         552800099, # *The Netherlands (2008-2012)
+         561601099) # Poland, Poznan (2008-2012)
+
+
+
+
+# numbers from original prev. studies of IARC except for numbers >= 100. These are new identification numbers for merging (as cid?!?! drop one of them!)                            
+sgcentre <- c(44, # Algeria
+              100, # Uganda
+              19, # Costa Rica
+              12, # Colombia 
+              23, # Shenyang
+              18, # India
+              61, # Iran
+              15, # Korea
+              2,  # HoChiMinh
+              7,  # Lampang
+              9,  # Argentina
+              14, # Songkla
+              3,  # Spain
+              3,  # Spain
+              16, # Chile
+              83, # Italy
+              4,  # Amsterdam
+              41) # Poland
+
+years <- c("2008-2011", # *Algeria, Setif 
+           "2008-2012", # *Uganda, Kyadondo County 
+           "2008-2011", #  Costa Rica 
+           "2008-2012", # Colombia, Bucaramanga 
+           "2008-2012", # China, Shenyang 
+           "2008-2012", # *India, Dindigul, Ambilikkai 
+           "2008-2011", # Iran (Islamic Republic of), Golestan Province 
+           "2008-2012", # Republic of Korea, Busan 
+           "2009-2012", # *Viet Nam, Ho Chi Minh City
+           "2008-2012", # Thailand, Lampang 
+           "2008-2011", # Argentina, Entre Rios Province 
+           "2008-2012", # Thailand, Songkhla 
+           "2008-2012", # Spain, Tarragona 
+           "2008-2012", # Spain, Girona 
+           "2008-2010", # *Chile, Region of Antofagasta 
+           "2008-2012", # Italy, Turin 
+           "2008-2012", # *The Netherlands
+           "2008-2012") # Poland, Poznan
+
+info <- data.frame(loc, "REGISTRY" = REG, sgcentre, cid, years)
+
+
+# exctract incidence count ###
+cases <- cases %>%
+  filter(REGISTRY %in% REG)%>%
+  filter(SEX == 2) %>% # females
+  filter(CANCER == 32) %>% # cervical cancer
+  select(c(1, 8:20))  # age grps (upper limit of age groups: 8-4 = 4, 4*5 = 20. > 20y & <= 80 y)
+
+# extract person years ###
+pyears <- pyears  %>%
+  filter(REGISTRY %in% REG)%>%
+  filter(SEX == 2) %>% # females
+  select(c(1, 7:19)) # age grps (7-3 = 4, 4*5 = 20. > 20y & <= 80 y)
+
+# inc: merged cases and pyears table ###
+inc <- merge(cases, pyears, by = "REGISTRY") # not by sgcentre as confusion when one centre twice (eg. spain = 3)
+inc <- merge(inc, info, by = "REGISTRY") # to assure infos and values are in same/correct order
+inc
+
+
 ## prev. in 5y age groups
 pooled.data <- read_dta("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/prevalence data for R codes/HPVPREV_POOL_V29-1.dta")
 
@@ -353,7 +466,7 @@ thai2.table
 prevalence[prevalence$cid == 16, 6:(dim(prevalence)[2])] <- thai2.table$prev
 prevalence[prevalence$cid == 16, "n"] <- dim(thai2.hrisk)[1]
 prevalence[prevalence$cid == 16, "sgcentre"] <- 14
-prevalence[prevalence$cid == 16, "Year"] <- "1997-1999"
+prevalence[prevalence$cid == 16, "Year"] <- "1990-2000"
 
 #### I. spain ####
 ####two incidences, however only one prevalence. therefore prev(spain1) = prev(spain2) = prev(spain)
@@ -489,11 +602,11 @@ prevalence[prevalence$cid == 22, "Year"] <- "2006"
 # remove NaN
 prevalence[prevalence == "NaN"] <- NA
 # remove 0
-prevalence[prevalence == 0] <- NA
+#prevalence[prevalence == 0] <- NA # Why??? 
 prevalence
 
-fact.lbl <- c("(15,20]", "(20,25]", "(25,30]", "(30,35]", "(35,40]", "(40,45]", "(45,50]", "(50,55]",
-              "(55,60]", "(60,65]", "(65,70]", "(70,75]", "(75,80]")
+fact.lbl <- c("[15,20)", "[20,25)", "[25,30)", "[30,35)", "[35,40)", "[40,45)", "[45,50)", "[50,55)",
+              "[55,60)", "[60,65)", "[65,70)", "[70,75)", "[75,80)")
 
 prev.model <- prevalence %>%
   gather(., "age.grp", "prev", "P1":"P13") %>%
@@ -506,6 +619,7 @@ prev.model$age.grp <- factor(prev.model$age.grp,
                                           levels = c("P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10", "P11", "P12", "P13"),
                                           labels = fact.lbl)
 prev.model$Year <- as.numeric(prev.model$Year)
+prev.model$cid <- as.numeric(prev.model$cid)
 prev.model$Year[prev.model$cid == 4 ] <- 2003 # chile. as nor inc rates before 2003
 str(prev.model)
 
@@ -522,11 +636,13 @@ mortality.lexis <- mortality %>%
 
 str(mortality.lexis)
 
+
 #### 
 
 ####
 ####
 ####data frame to calculate inc in hpv positive women####
+
 hpv.inc <- inc.ci5.all %>%
   tidyr::gather(., "inc.age", "inc.rate", 2:14) %>%
   mutate(lex.dur = 1) %>%
@@ -540,7 +656,6 @@ hpv.inc <- inc.ci5.all %>%
   select(-Location, - lex.dur) %>% # Midperiod is for mortality
   filter(!is.na(loc)) %>% # no loc when no incidence available (lost of doubled countries such as thailand!)
   mutate(ih = NA)
-
 hpv.inc <- hpv.inc[order(hpv.inc$cid, hpv.inc$age.grp, hpv.inc$Year),] # correct order needed for function to work
 head(hpv.inc)
 # NA in loc and registry only when no incidence, so acceptible
@@ -560,7 +675,8 @@ for(i in 1:nrow(hpv.inc)){
     hpv.inc$ih[i] <- hpv.inc$inc.rate[i] / hpv.inc$prev[i] * 10^2 # as 10^(-5)/10^(-2) = 10^(-3). 
 }
 tail(hpv.inc)
-hpv.inc[hpv.inc$cid == 4, ]
+hpv.inc[hpv.inc$loc == "Costa Rica" & hpv.inc$Year == 2006, ]
 
 head(hpv.inc)
-hpv.inc %>% filter(cid == 20)
+ver3 %>% filter(cid == 8)
+

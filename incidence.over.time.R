@@ -143,11 +143,18 @@ REG.XI <- c(101200199, # *Algeria, S?tif (2008-2011)
 # extract incidence rates from each volume
 
 #### CI5-VIII 1993-1997####
+    #First column is population number (see population dictionary)
+    #Second column is sex (1 Male/2 Female)
+    #Third column is cancer number (see cancer dictionary)
+    #Fourth column is age (1-19: 0-4,5-9,..,85+,unknown age)
+    #Fifth column is number of cancer cases by age
+    #Sixth column is person-years at risk by age
+
 dataVIII <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-VIII/CI5-VIII.csv", header = FALSE)
 incVIII <- dataVIII %>%
   filter(V1 %in% REG.VIII) %>%
-  filter(V2 == 2 & V3 == 120 & V4 >= 4 & V4 <= 16) %>%
-  mutate("V7" = round(V5 * 100000 / V6, 2)) %>%
+  filter(V2 == 2 & V3 == 120 & V4 >= 4 & V4 <= 16) %>% # filter females, cervical cancer, age >= 15 & <= 79 (age groups here 1-19)
+  mutate("V7" = round(V5 * 100000 / V6, 2)) %>% # new column with incidence rate per 100000
   select(-V2, -V3, -V5, - V6) %>%
   spread(V4, V7) %>%
   mutate("loc" = c("Colombia, Cali", "Costa Rica", "Pakistan"))  %>%
@@ -159,7 +166,12 @@ colnames(incVIII) <- c("REGISTRY", "R15_19", "R20_24", "R25_29", "R30_34", "R35_
                        "R50_54", "R55_59", "R60_64", "R65_69", "R70_74", "R75_79", "loc", "cid", "ci5", "Year")
 head(incVIII)
 
-#### CI5-IX 1998-2002 ####
+#### CI5-IX 1998-2002 #### 
+    #First column is sex (1 male/2 female)  
+    #Second column is the cancer site number (1 to 244, see "cancer.txt") 
+    #Third column is age-group, 0-4,5-9,10-14,...,80-84,85+,age unknown (1 to 19)  
+    #Fourth column is number of cases  
+    #Fifth column is person-years at risk
 # 117 cervix uteri (C53)
 info.IX <- data.frame("REGISTRY" = REG.IX, loc, cid, "ci5" = 9)
 files.IX <- na.exclude(files.IX)
@@ -245,7 +257,8 @@ head(incXI)
 inc.ci5.all <- rbind(incVIII, incIX, incX, incXI)
 head(inc.ci5.all)
 #inc.ci5.all <- inc.ci5.all[order(inc.ci5.all$Year), ]
-head(inc.ci5.all)
+
+inc.ci5.all[inc.ci5.all$cid == 17, ]
 
 ##### mortality and incidence per 100 000 per 5-year age group and country ####
 # mortality from mortality rates UN.R
