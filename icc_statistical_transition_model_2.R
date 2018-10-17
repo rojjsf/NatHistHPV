@@ -316,12 +316,12 @@ rowsXI <- nrow(incXI)
 incXI <- incXI[rep(1:rowsXI, each=5),] # one line per year as incidence time intervals differ from mortality's
 incXI$Year <- rep(2008:2012, rowsXI) 
 colnames(incXI) <- c("REGISTRY", "R15", "R20", "R25", "R30", "R35", "R40", "R45", 
-                     "R50", "R55", "R60", "R65", "R70", "R75", "country", "cid", "ci5", "Year")
+                     "R50", "R55", "R60", "R65", "R70", "R75", "ci5", "country", "cid", "Year")
 
 #### all available incidence rates from ci5 volume 9-11 #### 
 # matched with cid for locations in which hpv prevalence studies were conducted
 # intervals are filled with year under assumption that incidence constant over time interval.
-inc.ci5.all <- rbind(incVIII[, 2:18], incIX[, 2:18], incX[,2:18], incXI[,2:18])
+inc.ci5.all <- rbind(incVIII[, 2:18], incIX[, 2:18], incX[,2:18], incXI[,2:18], na.omit = TRUE)
 inc.ci5.all$cid <- as.numeric(inc.ci5.all$cid)
 
 
@@ -458,60 +458,78 @@ for(i in 1:(nrow(Dpop))){
 
 
 
+
 #### 10. Extract cohort age mina - maxa in study year ####
-
+ 
+# a loop with plot and models for each age group as output
 ggout <- list()
-for(i in c(20, 25, 30, 35)) {
-  
-mina <- i
-maxa <- i+5
+DpCout <- list()
+lcmm_out <- list()
 
-Dp <- data.frame(matrix(nrow = 0, ncol = 16)) # Dp = Data population (as nested in of Dpop)
-colnames(Dp) <- colnames(Dpop)
-
-for(j in info$cid){
-  sist <- (2012 - as.numeric(info$stY[info$cid == j])) # nb of years since prevalence Study
-  if(info$stY[info$cid == j] < 2012){ # excluding Iran (in 2014)
-    # cat("\n cid: ", j) # locating error
-    for(i in 0:sist){
-      a <- (mina+i):(maxa+i) # moving age group by one year
-      y <- as.numeric(Dpop$stY) + i # i years added to year of prev. Study
-      Dp <- rbind(Dp, Dpop[Dpop$age %in% a & Dpop$Year==y & Dpop$cid== j, ])
+for(d in c(4, 9, 14)){
+  cat("\n ageint: ", d) # locating error
+  #browser()
+  for(f in c(20, 25, 30, 35)) {
+    
+    mina <- f 
+    maxa <- sum(f, d)
+    
+    Dp <- data.frame(matrix(nrow = 0, ncol = 16)) # Dp = Data population (as nested in of Dpop)
+    colnames(Dp) <- colnames(Dpop)
+    
+    for(j in info$cid){
+      sist <- (2012 - as.numeric(info$stY[info$cid == j])) # nb of years since prevalence Study
+      if(info$stY[info$cid == j] < 2012){ # excluding Iran (in 2014)
+        # cat("\n cid: ", j) # locating error
+        for(i in 0:sist){
+          a <- (mina+i):(maxa+i) # moving age group by one year
+          y <- as.numeric(Dpop$stY) + i # i years added to year of prev. Study
+          Dp <- rbind(Dp, Dpop[Dpop$age %in% a & Dpop$Year==y & Dpop$cid== j, ])
+        }
+      }
     }
-  }
-}
-Dp <- Dp[!is.na(Dp$IR), ]
-# Years since Prevalence Study:
-Dp <- Dp %>%
-  mutate(YsncS = as.numeric(Dp$Year) - as.numeric(Dp$stY)) 
+    Dp <- Dp[!is.na(Dp$IR), ]
+    # Years since Prevalence Study:
+    Dp <- Dp %>%
+      mutate(YsncS = as.numeric(Dp$Year) - as.numeric(Dp$stY)) 
+    
+    #data frame DpC: cumulative rates for full cohort per country, year (not over full time period) ####
+    # Sum all cases and women of all ages (in previously selected age group) in each Year and country (location, cid)
+    DpC <- Dp %>%
+      ungroup() %>%
+      group_by(YsncS, cid, Location) %>% 
+      summarise(Npos = sum(Npos), 
+                Nicc = sum(Nicc), 
+                se = sqrt(sum(Nicc))/sum(Npos), # standard error of rates = rate^2/cases = sqrt(cases)/personyears
+                logRate = log(Nicc/Npos)) %>%
+      filter(Location != "Uganda") %>%
+      filter(Location != "Viet Nam")         
+    DpC$Location <- as.factor(DpC$Location)
+    DpC$cid <- as.factor(DpC$cid)
+    DpC[which(DpC$logRate < (-20)), "logRate"] <- NA # to avoid -Inf when Nicc = 0
+    DpCout[[stringr::str_c("DpC", mina, "_", maxa)]] <- DpC # to have all age cohort for mixed model
+  
+    
+    #### 11.Plot ####
+    
+    col <- c('#d8b365', '#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#67001f', '#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#003c30','#b15928', '#dd1c77', '#1c9099')
+    DpCplot <- ggplot2::ggplot(DpC, aes(x = YsncS, y = logRate)) + 
+      geom_point(aes(color = Location)) + 
+      geom_line(aes(color = Location)) +
+      scale_color_manual(values = col) +
+      ggtitle(stringr::str_c("cohort of HPV+ women ", mina, "-", maxa, "y (prev. age groups: ", ageintp, "y)")) +
+      ylab("log Transition Rate") +
+      xlab("Years since Prevalence Study") +
+      ylim(-11, -2) +
+      geom_linerange(aes(x = YsncS, ymin = log(Nicc/Npos - se), ymax = log(Nicc/Npos + se), color = Location)) + # add standard error bars
+      theme_bw()
+    ggout[[stringr::str_c("DpCplot", mina, "_", maxa)]] <- DpCplot
+    
+  
 
-#data frame DpC: cumulative rates for full cohort per country, year (not over full time period) ####
-# Sum all cases and women of all ages (in previously selected age group) in each Year and country (location, cid)
-DpC <- Dp %>%
-  ungroup() %>%
-  group_by(YsncS, cid, Location) %>% 
-  summarise(Npos = sum(Npos), Nicc = sum(Nicc), se = sqrt(sum(Nicc))/sum(Npos)) # standard error of rates = rate^2/cases = sqrt(cases)/personyears
-DpC$Location <- as.factor(DpC$Location)
-DpC$cid <- as.factor(DpC$cid)
-DpC <- DpC %>%
-  mutate(logRate = log(Nicc/Npos))
-
-
-#### 11.Plot ####
-
-col <- c('#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#67001f', '#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#003c30','#b15928', '#dd1c77', '#1c9099')
-DpCplot <- ggplot2::ggplot(DpC, aes(x = YsncS, y = logRate)) + 
-  geom_point(aes(color = Location)) + 
-  geom_line(aes(color = Location)) +
-  scale_color_manual(values = col) +
-  ggtitle(stringr::str_c("Yearly log Transition Rate in HPV+ women aged ", mina, "-", maxa, "y at study entry")) +
-  ylab("log Transition Rate") +
-  xlab("Years since Prevalence Study") +
-  theme_bw()
-ggout[[stringr::str_c("DpCplot", mina)]] <- DpCplot
-}
-
-gridExtra::grid.arrange(ggout$DpCplot20, ggout$DpCplot25, ggout$DpCplot30, ggout$DpCplot35)
+#DpC_5y_grid <- gridExtra::grid.arrange(ggout$DpCplot20_24, ggout$DpCplot25_29, ggout$DpCplot30_34, ggout$DpCplot35_39)
+#DpC_10y_grid <- gridExtra::grid.arrange(ggout$DpCplot20_29, ggout$DpCplot25_34, ggout$DpCplot30_39, ggout$DpCplot35_44)
+#DpC_15y_grid <- gridExtra::grid.arrange(ggout$DpCplot20_34, ggout$DpCplot25_39, ggout$DpCplot30_44, ggout$DpCplot35_49)
 
 
 
@@ -528,35 +546,46 @@ gridExtra::grid.arrange(ggout$DpCplot20, ggout$DpCplot25, ggout$DpCplot30, ggout
 #DpCplot
 
 
+
+
 #### 12. Model ####
 
-#ln(Nicc/Npos) = alpha + beta*YsncS
+# ln(Nicc/Npos) = alpha + beta*YsncS
 # beta is rate of change 
 nd <- data.frame(YsncS = 0:15)
 
 # latent class mixed model
-par(mfrow = c(2, 4))
+#par(mfrow = c(2, 4))
+ # select age group from loop
 
-for(i in c(1:4)){
+
+ for(i in c(1:4)){
+  
   if(i == 1) {
     tr_lcmm <- lcmm(logRate ~ YsncS, random = ~ YsncS, subject = "Location",  ng = i, data = DpC)
     tr_lcmm_s <- lcmm(logRate ~ YsncS, random = ~ YsncS, subject = "Location",  ng = i, data = DpC, link = "splines")
       }else{
-  tr_lcmm <- lcmm(logRate ~ YsncS, mixture = ~ YsncS, random = ~ YsncS, subject = "Location",  ng = i, data = DpC)
-  tr_lcmm_s <- lcmm(logRate ~ YsncS, mixture = ~ YsncS, random = ~ YsncS, subject = "Location",  ng = i, data = DpC, link = "splines")
+    tr_lcmm <- lcmm(logRate ~ YsncS, mixture = ~ YsncS, random = ~ YsncS, subject = "Location",  ng = i, data = DpC)
+    tr_lcmm_s <- lcmm(logRate ~ YsncS, mixture = ~ YsncS, random = ~ YsncS, subject = "Location",  ng = i, data = DpC, link = "splines")
       }
+  
   bic <- round(tr_lcmm$BIC, 2)
   bic_s <- round(tr_lcmm_s$BIC, 2)
-  tr_pred<- predictY(tr_lcmm, nd, methInteg = 1, draws = TRUE)
-  tr_pred_s<- predictY(tr_lcmm_s, nd, methInteg = 1, draws = TRUE)
-  plot(tr_pred, main = stringr::str_c("lmm (BIC = ", bic,") rate hpv-cc, age ", mina, "-", maxa), 
-     ylab = "log (Transition Rate)",
-     ylim = c(-10, 0))
-  plot(tr_pred_s, main = stringr::str_c("glmm (BIC = ", bic_s,") rate hpv-cc, age ", mina, "-", maxa), 
+  
+  tr_pred <- predictY(tr_lcmm, nd, methInteg = 1, draws = TRUE)
+  tr_pred_s <- predictY(tr_lcmm_s, nd, methInteg = 1, draws = TRUE)
+  
+  lcmm_out[[stringr::str_c("tr_plot", mina, "_", maxa, "ng", i)]] <- 
+    plot(tr_pred, main = stringr::str_c("lmm (BIC = ", bic,") rate hpv-cc, age ", mina, "-", maxa), 
+       ylab = "log (Transition Rate)",
+       ylim = c(-10, 0))
+  lcmm_out[[stringr::str_c("tr_plot_s", mina, "_", maxa, "ng", i)]] <- 
+    plot(tr_pred_s, main = stringr::str_c("glmm (BIC = ", bic_s,") rate hpv-cc, age ", mina, "-", maxa), 
        ylab = "log (Transition Rate)",
        ylim = c(-10, 0))
   }
-  
+  }
+}
 
  # glmm package
 DpC <- DpC %>%
