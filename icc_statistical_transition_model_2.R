@@ -462,7 +462,7 @@ for(i in 1:(nrow(Dpop))){
 #### 10. Extract cohort age mina - maxa in study year ####
  
 # a loop with plot and models for each age group as output
-ggout <- list()
+gg_out <- list()
 DpCout <- list()
 lcmm_out <- list()
 
@@ -500,8 +500,9 @@ for(d in c(4, 9, 14)){
       group_by(YsncS, cid, Location) %>% 
       summarise(Npos = sum(Npos), 
                 Nicc = sum(Nicc), 
-                se = sqrt(sum(Nicc))/sum(Npos), # standard error of rates = rate^2/cases = sqrt(cases)/personyears
-                logRate = log(Nicc/Npos)) %>%
+                se = sqrt(sum(Nicc))/sum(Npos), # standard error of rates = rate^2/cases = sqrt(cases)/personyears (Esteve p. 52)
+                logRate = log(sum(Nicc)/sum(Npos)), 
+                selog = sqrt(1/sum(Npos))) %>%
       filter(Location != "Uganda") %>%
       filter(Location != "Viet Nam")         
     DpC$Location <- as.factor(DpC$Location)
@@ -517,23 +518,24 @@ for(d in c(4, 9, 14)){
       geom_point(aes(color = Location)) + 
       geom_line(aes(color = Location)) +
       scale_color_manual(values = col) +
-      ggtitle(stringr::str_c("cohort of HPV+ women ", mina, "-", maxa, "y (prev. age groups: ", ageintp, "y)")) +
+      ggtitle(stringr::str_c("cohort of HPV+ women ", mina, "-", maxa, "y (prev.grps: ", ageintp, "y)")) +
       ylab("log Transition Rate") +
       xlab("Years since Prevalence Study") +
       ylim(-11, -2) +
-      geom_linerange(aes(x = YsncS, ymin = log(Nicc/Npos - se), ymax = log(Nicc/Npos + se), color = Location)) + # add standard error bars
+      geom_linerange(aes(x = YsncS, ymin = logRate - selog, ymax = logRate + selog, color = Location)) + # add standard error bars
       theme_bw()
-    ggout[[stringr::str_c("DpCplot", mina, "_", maxa)]] <- DpCplot
-    
+    gg_out[[stringr::str_c("DpCplot", mina, "_", maxa)]] <- DpCplot
+  }
+  }    
   
 
-#DpC_5y_grid <- gridExtra::grid.arrange(ggout$DpCplot20_24, ggout$DpCplot25_29, ggout$DpCplot30_34, ggout$DpCplot35_39)
-#DpC_10y_grid <- gridExtra::grid.arrange(ggout$DpCplot20_29, ggout$DpCplot25_34, ggout$DpCplot30_39, ggout$DpCplot35_44)
-#DpC_15y_grid <- gridExtra::grid.arrange(ggout$DpCplot20_34, ggout$DpCplot25_39, ggout$DpCplot30_44, ggout$DpCplot35_49)
+DpC_5y_grid <- gridExtra::grid.arrange(gg_out$DpCplot20_24, gg_out$DpCplot25_29, gg_out$DpCplot30_34, gg_out$DpCplot35_39)
+DpC_10y_grid <- gridExtra::grid.arrange(gg_out$DpCplot20_29, gg_out$DpCplot25_34, gg_out$DpCplot30_39, gg_out$DpCplot35_44)
+DpC_15y_grid <- gridExtra::grid.arrange(gg_out$DpCplot20_34, gg_out$DpCplot25_39, gg_out$DpCplot30_44, gg_out$DpCplot35_49)
 
 
 
-#col <- c('#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#67001f', '#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#003c30','#b15928', '#dd1c77', '#1c9099')
+ #col <- c('#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#67001f', '#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#003c30','#b15928', '#dd1c77', '#1c9099')
 #DpCplot <- ggplot2::ggplot(DpC, aes(x = YsncS, y = Nicc * 100000/Npos)) + 
 #  geom_point(aes(color = Location)) + 
 #  geom_line(aes(color = Location)) +
@@ -584,8 +586,8 @@ nd <- data.frame(YsncS = 0:15)
        ylab = "log (Transition Rate)",
        ylim = c(-10, 0))
   }
-  }
-}
+  
+
 
  # glmm package
 DpC <- DpC %>%

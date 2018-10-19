@@ -146,8 +146,8 @@ pooled.data <- read_dta("I:/Projects/International Correlation of HPV and Cervic
 
 #### 3. select age groups cohort and prevalence ####
 # for cohort, model, graph
-mina <- 20
-maxa <- 25
+# mina <- 20
+# maxa <- 25
 # for prevalence
 ageintp <- 15
 minp <- 20
@@ -469,10 +469,11 @@ DpCout <- list()
 lcmm_out <- list("tr_lcmm", "tr_bic", "tr_pred", "tr_prob", "tr_conv", "tr_coef")
 lcmm_plot <- list()
 
-for(d in c(4)){
+
+for(d in c(4, 9, 14)){
   cat("\n ageint: ", d) # locating error
   #browser()
-  for(f in c(35)) {
+  for(f in c(20, 25, 30, 35)) {
     
     mina <- f 
     maxa <- sum(f, d)
@@ -504,8 +505,8 @@ for(d in c(4)){
       summarise(Npos = sum(Npos), 
                 Nicc = sum(Nicc), 
                 se = sqrt(sum(Nicc))/sum(Npos), # standard error of rates = rate^2/cases = sqrt(cases)/personyears (Esteve p. 52)
-                logRate = log(Nicc/Npos), 
-                selog = sqrt(1/Npos)) %>% # var(log(k/m)) = 1/(Rate*pyears); se(log(k/m)) = sqrt(1/k). Esteve p. 53
+                logRate = log(sum(Nicc)/sum(Npos)), 
+                selog = sqrt(1/sum(Npos))) %>% # var(log(k/m)) = 1/(Rate*pyears); se(log(k/m)) = sqrt(1/k). Esteve p. 53
       filter(Location != "Uganda") %>%
       filter(Location != "Viet Nam")         
     DpC$Location <- as.factor(DpC$Location)
@@ -589,12 +590,12 @@ for(d in c(4)){
        
       # predictions
       lcmm_out$tr_pred[[stringr::str_c("tr_pred_", mina, "_", maxa, "ng_", i)]] <- 
-        tr_pred <- predictY(tr_lcmm, nd, methInteg = 1, draws = TRUE)
+        tr_pred <- predictY(tr_lcmm, nd, methInteg = 1, draws = TRUE) # Monte Carlo prediction, with CI
       lcmm_out$tr_pred[[stringr::str_c("tr_pred_s_", mina, "_", maxa, "ng_", i)]] <- 
         tr_pred_s <- predictY(tr_lcmm_s, nd, methInteg = 1, draws = TRUE)
        
       # groups
-      lcmm_out$tr_prob[[stringr::str_c("tr_prob_", mina, "_", maxa, "ng_", i)]] <- tr_lcmm$pprob
+      lcmm_out$tr_prob[[stringr::str_c("tr_prob_", mina, "_", maxa, "ng_", i)]] <- tr_lcmm$pprob # post estimation bayes estimate ob probablity to belong it classes
       lcmm_out$tr_prob_s[[stringr::str_c("tr_prob_s_", mina, "_", maxa, "ng_", i)]] <- tr_lcmm_s$pprob
        
       # convergence criteria
@@ -607,14 +608,14 @@ for(d in c(4)){
        
       # plot
       par(mfrow= c(1, 2))
-      lcmm_plot[[stringr::str_c("tr_plot", mina, "_", maxa, "ng_", i)]] <- 
+      
         plot(tr_pred, main = stringr::str_c("lmm (BIC = ", bic,") rate hpv-cc, age ", mina, "-", maxa), 
              ylab = "log (Transition Rate)",
              ylim = c(-10, 0), 
              lty = c(rep(1, times = i), rep(3, times = i)), 
              lwd = c(rep(2, times = i), rep(0.5, times = i)), 
              col = cols[1:i])
-      lcmm_plot[[stringr::str_c("tr_plot_s_", mina, "_", maxa, "ng_", i)]] <- 
+    
         plot(tr_pred_s, main = stringr::str_c("glmm (BIC = ", bic_s,") rate hpv-cc, age ", mina, "-", maxa), 
              ylab = "log (Transition Rate)",
              ylim = c(-10, 0),
