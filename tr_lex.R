@@ -16,14 +16,27 @@ Hrisk <- c("ahpv16", "ahpv18", "ahpv31","ahpv33","ahpv35","ahpv39","ahpv45","ahp
 #  mutate(betag = 1) %>% 
 #  mutate(sgid = hpvcode) %>% 
 #  mutate(sga3 = AGE)
+tr_pp <- list() 
 
 #fix country-specific variables:
-c <- 1 # int.corr.overview.xlsx
-sg <- 44 # codebook_pool_v1.doc
-st <- 2008 # int.corr.overview.xlsx /or/ max(Ldata$sga1yy)
+c <- 17 # int.corr.overview.xlsx
+sg <- 3 # codebook_pool_v1.doc
+st <- 2000 # int.corr.overview.xlsx /or/ max(Ldata$sga1yy)
 mina <- 25 # begin age group
 maxa <- 34 # max age group
-tr <- lcmm_out$tr_pred$`25_34`
+tr <- lcmm_out$tr_pred$`25-34`
+
+### cum inc to compare
+cum_dat <- Dp_out$Dp25_34 %>% ## specify age group!
+  ungroup() %>%
+  group_by(sgcentre, cid, Location, stY) %>%
+  arrange(YsncS) %>%
+  #summarise(cumR = last(cumsum(IR/5*10^(-5))))
+  summarise(cumR = last(cumsum(Nicc)/cumsum(PopFemale[YsncS == 0])))
+cum_dat
+
+
+#### Pre-Lexis object ####
 
 Ldata <- pooled.data %>%
   mutate(hpvh = rowSums(pooled.data[, Hrisk], na.rm = TRUE)) %>%
@@ -57,10 +70,9 @@ PreLex <- Lexis(entry = list(age = as.numeric(entry.age),
                 id = sgid,
                 data = Ldata)
 
-####Data frame with mortality and hpv+ adjusted incidence rates per age and calender year ####
-# rates from inc.hpv.pos.R
 
 
+#### Rates ####
 Dpop$Rate <-  Dpop$Nicc/Dpop$Npos
 Dpop$YsncS <- as.numeric(Dpop$Year) - as.numeric(Dpop$stY)
 lex_dat <- Dpop %>%  
@@ -71,7 +83,7 @@ lex_dat <- Dpop %>%
 head(lex_dat)
 
 
-# mortality only for free, as already accounted for in icc Rate
+# mortality 
 mr <- function(x){
   for(a in 1:nrow(x)){
     id <- x[a, "age"] 
@@ -90,19 +102,9 @@ ir <- function(x){
   }
 }
 
-
-#ir <- function(x){
-#  for(b in 1:nrow(x)){
-#    if(x[b, "lex.Cst"] == "hpv"){
-#      id <- x[b, "age"]
-#      y <- x[b, "calender"]
-#      return(lex_dat[lex_dat$age==id & lex_dat$calender == y & lex_dat$cid == c, "Rate"])
-#    }
-#  }
-#}
-
 ##Transition object
-Tr <- list("hpv" = list("icc" = ir),
+Tr <- list("hpv" = list("icc" = ir,
+                        "death" = mr),
            "free" = list("death" = mr))
 
 ## Lexis simulation - only for one country
@@ -115,7 +117,27 @@ nSt <- nState(hpvSim,
 nSt
 
 ## plot
-pp <- pState( nSt, perm=c(3, 2, 1) ) # perm changes order of states (recalculaes percentages)
-tail( pp )
-plot( pp, col = c("black", "white", "white"), ylim = c(0, 0.01))
-mtext(stringr::str_c("Costa Rica ", mina, "-", maxa, "y old, cumProb(ICC|no death)"), side = 3, line = 1)
+pp <- as.data.frame(pState( nSt, perm=c(3, 2, 1)))
+pp$time <- c(st:2012)
+tr_pp$pp[[stringr::str_c("c_", c, "_", mina, "-", maxa)]] <- pp["2012", "icc"]
+tr_pp$cum[[stringr::str_c("c_", c, "_", mina, "-", maxa)]] <- cum_point <- cum_dat$cumR[cum_dat$cid==c]
+tr_pp$plot[[stringr::str_c("c_", c, "_", mina, "-", maxa)]] <-
+  ggplot(pp, aes(time, icc)) +
+  theme_minimal() +
+  geom_line() +
+  ylim(0, 0.01) +
+  geom_point(aes(x = 2012, y = cum_point), color = "red") + 
+  labs(title = stringr::str_c("Lexis predicted cumProb(ICC|no death) in cid=", c, ", ", mina, "-", maxa, "y"),
+       subtitle = "cumulative incidence in all women") +
+  theme(plot.subtitle = element_text(color = "red"))
+
+
+### comparision
+cum_prob <- as.data.frame(t(bind_rows(tr_pp$cum, tr_pp$pp))) # transpose: switch rows and columns
+colnames(cum_prob) <- c("cum", "pred")
+
+ggplot(cum_prob, aes(pred, cum)) +
+  geom_point() +
+  xlim(0, 0.01) +
+  ylim(0, 0.01)
+ # diff colors per age group and cid!
