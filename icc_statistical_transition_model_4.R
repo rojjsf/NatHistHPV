@@ -151,7 +151,7 @@ pooled.data <- read_dta("I:/Projects/International Correlation of HPV and Cervic
 # for prevalence
 ageintp <- 10
 minp <- 20
-maxp <- 60
+maxp <- 70
 
 
 #### 4. mortality ####
@@ -467,14 +467,14 @@ for(i in 1:(nrow(Dpop))){
 ggout <- list()
 DpCout <- list()
 lcmm_out <- list("tr_lcmm", "tr_bic", "tr_pred", "tr_prob", "tr_conv", "tr_lambda")
-
+Dp_out <- list()
 
 
 for(d in c(4, 9)){
   cat("\n ageint: ", d) # locating error
   #browser()
-  for(f in c(20, 25, 30)) {
-    
+  for(f in c(20, 25, 30, 35, 40, 45, 50, 55, 60)) {
+    cat("\n age.beg: ", f)
     mina <- f 
     maxa <- sum(f, d)
     
@@ -496,7 +496,7 @@ for(d in c(4, 9)){
     # Years since Prevalence Study:
     Dp <- Dp %>%
       mutate(YsncS = as.numeric(Dp$Year) - as.numeric(Dp$stY)) 
-    
+    Dp_out[[stringr::str_c("Dp", mina, "_", maxa)]] <- Dp
     #data frame DpC: cumulative rates for full cohort per country, year (not over full time period) ####
     # Sum all cases and women of all ages (in previously selected age group) in each Year and country (location, cid)
     DpC <- Dp %>%
@@ -511,7 +511,7 @@ for(d in c(4, 9)){
       filter(Location != "Viet Nam")         
     DpC$Location <- as.factor(DpC$Location)
     DpC$cid <- as.factor(DpC$cid)
-    DpC[which(DpC$logRate < (-20)), "logRate"] <- NA # to avoid -Inf when Nicc = 0
+    DpC[which(DpC$Nicc <= 0 | DpC$Npos <= 0 ), c("Nicc", "Npos", "logRate", "se")] <- NA # to avoid -Inf when Nicc = 0
     DpCout[[stringr::str_c("DpC", mina, "_", maxa)]] <- DpC # to have all age cohort for mixed model
     
     
@@ -525,7 +525,7 @@ for(d in c(4, 9)){
       ggtitle(stringr::str_c("cohort of HPV+ women ", mina, "-", maxa, "y")) +
       ylab("cervical cancer inidence Rate in HPV+ women") +
       xlab("Years since HPV detection") +
-      ylim(-10.5, -3) +
+      ylim(-10.5, -2) +
       geom_linerange(aes(x = YsncS, ymin = logRate - selog, ymax = logRate + selog, color = Location)) + # add standard error bars
       theme_bw()
     ggout$DpC_plot[[stringr::str_c(mina, "_", maxa)]] <- DpCplot
@@ -560,11 +560,10 @@ for(d in c(4, 9)){
     nd <- data.frame(YsncS = 0:18)
     
     # latent class mixed model
-    #par(mfrow = c(2, 4))
+    # par(mfrow = c(2, 4))
     # select age group from loop
   
-    
-        lcmm_out$tr_lcmm[[stringr::str_c(mina, "_", maxa)]] <- 
+      lcmm_out$tr_lcmm[[stringr::str_c(mina, "_", maxa)]] <- 
           tr_lcmm <- lcmm(logRate ~ YsncS, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC, link = "splines")
      
       # bic
@@ -584,7 +583,7 @@ for(d in c(4, 9)){
       ## slope
       lcmm_out$tr_lambda[[stringr::str_c(mina, "_", maxa)]] <- # 1 gamma per year
           tr_lambda <- data.frame("YsncS" = tr_pred$times[2:19,]-0.5, 
-                                 "gamma" = diff(tr_pred$pred[, 1]))
+                                 "lambda" = diff(tr_pred$pred[, 1]))
       
       m_logr <- data.frame("logr" = tr_pred$pred[, 1], 
                            "logr_lo" = tr_pred$pred[, 2],
@@ -604,7 +603,6 @@ for(d in c(4, 9)){
         ggtitle(stringr::str_c(mina, "_", maxa, "y")) +
         ylab("log Incidence Rate in hrHPV+ women") +
         xlab("Years since HPV detection") +
-        theme()
         ylim(-10.5, -3)  +
         # geom_linerange(aes(x = YsncS, ymin = logRate - selog, ymax = logRate + selog, color = Location)) + # add standard error bars
         theme_bw() + 
@@ -623,11 +621,12 @@ parr5y_1 <- cowplot::plot_grid(ggout$tr_plot$`20_24` + theme(legend.position = "
                                ggout$tr_plot$`25_29`+ theme(legend.position = "none"))
 parr5y_2 <- cowplot::plot_grid(ggout$tr_plot$`30_34` + theme(legend.position = "none"),
                                leg)
-parr10y <- cowplot::plot_grid(ggout$tr_plot$`20_29` + theme(legend.position = "none"), 
-                              ggout$tr_plot$`25_34` + theme(legend.position = "none"),
-                             nrow = 2)
+parr10y_1 <- cowplot::plot_grid(ggout$tr_plot$`20_29` + theme(legend.position = "none"), 
+                              ggout$tr_plot$`25_34` + theme(legend.position = "none"))
+parr10y_2 <- cowplot::plot_grid(ggout$tr_plot$`30_39` + theme(legend.position = "none"),
+                               leg)
 gg5y <- cowplot::plot_grid(parr5y_1, parr5y_2, nrow = 2)
-gg10y <- cowplot::plot_grid(parr10y, leg, rel_widths = c(3, .8))
+gg10y <- cowplot::plot_grid(parr10y_1, parr10y_2, nrow = 2)
 
 
 
@@ -664,25 +663,24 @@ gg10y <- cowplot::plot_grid(parr10y, leg, rel_widths = c(3, .8))
   
 
 
-#### 12.   Plot all gamma #### 
+#### 12.   Plot all lambda #### 
 
   df_g <- data.frame(lcmm_out$tr_lambda$`20_24`)
-  df_gamma <- df_g %>%
-    mutate("20_24" = gamma,
+  df_lambda <- df_g %>%
+    mutate("20_24" = lambda,
            "25_29" = lcmm_out$tr_lambda$`25_29`[, 2],
            "30_34" = lcmm_out$tr_lambda$`30_34`[, 2],
            "20_29" = lcmm_out$tr_lambda$`20_29`[, 2],
            "25_34" = lcmm_out$tr_lambda$`25_34`[, 2]) %>%
-    select(-gamma) %>%
-    gather("AgeGroup", "gamma", 2:6) 
-  df_gamma$AgeGroup <- factor(df_gamma$AgeGroup, levels = c("20_24", "25_29", "30_34", "20_29", "25_34"),  
+    select(-lambda) %>%
+    gather("AgeGroup", "lambda", 2:6) 
+  df_lambda$AgeGroup <- factor(df_lambda$AgeGroup, levels = c("20_24", "25_29", "30_34", "20_29", "25_34"),  
                      labels = c("20-24", "25-29", "30-34", "20-29", "25-34"))
   
   cols <- c('#b2182b','#d6604d','#f4a582','#998ec3','#d8daeb')
   line <- c("solid", "solid", "solid", "dashed", "dashed")
 
-  plot_gamma  
-  ggplot(df_gamma, aes(YsncS, gamma)) +
+  plot_lambda <-  ggplot(df_lambda, aes(YsncS, lambda)) +
     geom_smooth(aes(color = AgeGroup,  linetype = AgeGroup), se = FALSE) +
     scale_linetype_manual(values = line) +
     scale_color_manual(values = cols) +
