@@ -655,7 +655,8 @@ for(d in c(9)){
       #         "en" = c("free"), 
       #         "sgid" = 1:50, 
       #         "ex" = c(rep(c("free", "death"), 24), "icc", "icc"))
-       
+      Ldata <- Ldata %>%
+        filter(Ldata$entry.age >= mina & Ldata$entry.age <= maxa) 
       
       PreLex <- Lexis(entry = list(age = as.numeric(entry.age),
                                    calender = as.numeric(Year)),
@@ -700,7 +701,7 @@ for(d in c(9)){
                               "death" = mr))
       
       ##`Lexis simulation - only for one country
-      hpvSim <- simLexis(Tr, PreLex, t.range = 20, N = 20)
+      hpvSim <- simLexis(Tr, PreLex, t.range = 20, N = 10)
       
       nSt <- nState(hpvSim,
                     at=seq(0, (2012-st), 1), from= st, time.scale="calender")
@@ -792,7 +793,7 @@ for(d in c(9)){
                  "free" = list("death" = mr))
       
       ##`Lexis simulation - only for one country
-      hpvSim <- simLexis(Tr, PreLex, t.range = 20, N = 20)
+      hpvSim <- simLexis(Tr, PreLex, t.range = 20, N = 10)
       
       ##`simulate cohort
       nSt <- nState(hpvSim,
@@ -833,8 +834,8 @@ ggplot(cum_prob, aes(pred, cum)) +
   #geom_line(aes(color = Location), size = 1.3) +
   stat_smooth(method = "lm", aes(color = Location), size = 1, se = FALSE, formula = y ~ x-1) +
   geom_point(aes(shape = AgeGroup, color = Location), size = 2.1) +
-  xlim(0, 0.05) +
-  ylim(0, 0.05) +
+  xlim(0, 0.06) +
+  ylim(0, 0.06) +
   labs(title = "Comparing predicted cervical cancer cumulative incidence by country and age group", 
        subtitle = "IR: prediction with CI5 rates for whole population. HPV: prediction with estimated rates in hrHPV+ women.",
        x = "predicted cumulative incidence probablity (HPV)",
@@ -846,8 +847,8 @@ ggplot(cum_prob, aes(pred, cum)) +
   #geom_smooth(aes(color = AgeGroup), size = 1, se = FALSE) +
   stat_smooth(method = "lm", aes(color = AgeGroup), size = 1, se = FALSE, formula = y ~ x-1) +
   geom_point(aes(color= AgeGroup), size = 2) +
-  xlim(0, 0.05) +
-  ylim(0, 0.05) +
+  xlim(0, 0.052) +
+  ylim(0, 0.052) +
   labs(title = "Comparing predicted cumulative cervical cancer incidence by age group", 
        subtitle = "IR: prediction using CI5 rates for all women. HPV: prediction using estimated rates in hrHPV+ women.",
        x = "predicted cumulative incidence probablity (HPV)",
@@ -862,6 +863,7 @@ ggplot(cum_prob, aes(x = AgeGroup, y = cum)) +
 
 
 ggplot(cum_prob, aes(x = AgeGroup, y = pred)) +
+  theme_classic() +
   geom_boxplot() +
   labs(title = "Predicted cumulative cervical cancer incidence by age group of hrHPV detection", 
        subtitle = "Prediction with multistate model using estimated rates in hrHPV+ women",
