@@ -28,37 +28,44 @@ library(stringr)
 # girona not run
 
 
-info <- data.frame(matrix(nrow = 16, ncol = 0))
+# CHina, shanxi added
+# Spain, Girona removed
+
+info <- data.frame(matrix(nrow = 18, ncol = 0))
 info <- info %>%
-  mutate("cid" = c(1,  2,  5,  6,  8,  9, 12, 13, 15,  3, 16, 17, 
-                   #18,
-                   4, 20, 19, 22), # assigned by Rosa
-         "sgcentre" = c(44, 100, 19, 12, 23, 18, 15,  2,  7,  9, 14,  3,  #3,
-                        16, 83,  4, 41), # defined by IARC prevalence studies
-         "stY" = c("2007-2008", "2002-2004", "1993-1994", "1993-1995", "2005", "2004", "1999-2000", "1997", "1997-1998", 
-                   "1998", "1990-2000", "1998", #"1998", 
-                   "2001", "2002", "1995-1998", "2006"),
+  mutate("cid" = c(1,  2,  5,  6,  8,  9, 10, 12, 13, 15,  3, 16, 17, 
+                   #18,  
+                   4, 20, 19, 22, 71), # assigned by Rosa
+         "sgcentre" = c(44, 100, 19, 12, 23, 18, 61, 15,  2,  7,  9, 14,  3,  
+                        #3, 
+                        16, 83,  4, 41, 20), # defined by IARC prevalence studies
+         "stY" = c("2007-2008", "2002-2004", "1993-1994", "1993-1995", "2005", "2004", "2013-2014", "1999-2000", "1997", "1997-1998", 
+                   "1998", "1990-2000", "1998", 
+                   #"1998", 
+                   "2001", "2002", "1995-1998", "2006", "2004"),
          "loc.prev" = c("Algeria, Setif","Uganda, Kyadondo County", "Costa Rica",                
                         "Colombia, Bucaramanga","China, Shenyang","India, Dindigul, Ambilikkai",                  
-                        "Republic of Korea, Busan",   "Viet Nam, Ho Chi Minh City",                   
+                        "Iran (Islamic Republic of), Golestan Province", "Republic of Korea, Busan",   "Viet Nam, Ho Chi Minh City",                   
                         "Thailand, Lampang","Argentina, Entre Rios Province", "Thailand, Songkhla",        
                         "Spain, Tarragona", 
                         #"Spain, Girona", 
                         "Chile, Region of Antofagasta",                 
-                        "Italy, Turin", "The Netherlands", "Poland, Warsaw"),  # Prevalence STudy location
-         "country" =  c("Algeria", "Uganda", "Costa Rica", "Colombia", "China", "India",   "Republic of Korea", "Viet Nam", "Thailand", # for mortality, population
+                        "Italy, Turin", "The Netherlands", "Poland, Poznan", "China, Shanxi"),  # Prevalence STudy location
+         "country" =  c("Algeria", "Uganda", "Costa Rica", "Colombia", "China", "India", "Iran (Islamic Republic of)",  "Republic of Korea", "Viet Nam", "Thailand", # for mortality, population
                         "Argentina", "Thailand", "Spain", 
                         #"Spain", 
-                        "Chile", "Italy", "Netherlands", "Poland"),
-         "Location" = c("Algeria", "Uganda", "Costa Rica", "Colombia", "China", "India",   "Republic of Korea", "Viet Nam", "Thailand (Lampang)", # for graph
-                        "Argentina", "Thailand (Songkhla)", "Spain (Tarragona)", #"Spain (Girona)",
-                        "Chile", "Italy", "Netherlands", "Poland"),
+                        "Chile", "Italy", "Netherlands", "Poland", "China"),
+         "Location" = c("Algeria", "Uganda", "Costa Rica", "Colombia", "China(Shenyang)", "India", "Iran (Islamic Republic of)",  "Republic of Korea", "Viet Nam", "Thailand (Lampang)", # for graph
+                        "Argentina", "Thailand (Songkhla)", "Spain (Terragona)", 
+                        #"Spain (Girona)", 
+                        "Chile", "Italy", "Netherlands", "Poland", "China(Shanxi)"),
          "REG.VIII" = c(NA, # IRR Algeria, S?tif 
                         NA, # IRR Uganda, Kyadondo County 
                         12, # *Costa Rica (1995-1996) prev: 1993/4
                         11, #  Colombia, Cali (1992-1996) (NO Bucamaranga in this volume) prev: 1993/5
                         NA, # IRR China, Shenyang 
                         NA, # IRR India, Dindigul, Ambilikkai 
+                        NA, # IRR Iran (Islamic Republic of), Golestan Province 
                         NA, # IRR Korea, Busan (1996-1997) 
                         NA, # IRR Viet Nam, Ho Chi Minh City 
                         NA, #	IRR Thailand, Lampang 
@@ -69,13 +76,15 @@ info <- info %>%
                         NA, # Chile, Region of Antofagasta  
                         NA, # IRR Italy, Turin 
                         NA, # IRR The Netherlands
-                        NA), # IRR Poland, Poznan
+                        NA, # IRR Poland, Poznan
+                        NA),# IRR China, Shanxi
          "files.IX" = c(NA, # IRR Algeria, S?tif 
                         NA, # IRR Uganda, Kyadondo County 
                         "21880099.csv", #	Costa Rica (1998-2002)
                         "21700199.csv", # Colombia, Cali (1998-2002) (NO Bucamaranga in this volume)
                         NA, # IRR China, Shenyang 
                         NA, # IRR India, Dindigul, Ambilikkai 
+                        NA, # IRR Iran (Islamic Republic of), Golestan Province 
                         "44100299.csv", #	Korea, Busan (1998-2002) 
                         NA, # Viet Nam, Ho Chi Minh City (NO data on Viet Nam in this volume)
                         "47640599.csv", #	Thailand, Lampang (1998-2002)
@@ -86,13 +95,15 @@ info <- info %>%
                         NA, # Chile, Region of Antofagasta  (NO data for chile, prevalence study in 2001 - very close to 2002)
                         "53800899.csv", # IRR Italy, Turin 
                         "55280099.csv", #	The Netherlands (1998-2002)
-                        NA), # IRR Poland
+                        NA, # IRR Poland, Poznan 
+                        NA),# IRR China, Shanxi
          "REG.IX" = c(NA, # IRR Algeria, S?tif 
                       NA, # IRR Uganda, Kyadondo County 
                       21880099, #	Costa Rica (1998-2002)
                       21700199, # Colombia, Cali (1998-2002) (NO Bucamaranga in this volume)
                       NA, # IRR China, Shenyang 
                       NA, # IRR India, Dindigul, Ambilikkai 
+                      NA, # IRR Iran (Islamic Republic of), Golestan Province 
                       44100299, #	Korea, Busan (1998-2002) 
                       NA, # Viet Nam, Ho Chi Minh City (NO data on Viet Nam in this volume)
                       47640599, #	Thailand, Lampang (1998-2002)
@@ -103,14 +114,15 @@ info <- info %>%
                       NA, # Chile, Region of Antofagasta  (NO data for chile, prevalence study in 2001 - very close to 2002)
                       53800899, # Italy, Turin 
                       55280099, #	The Netherlands (1998-2002) 
-                      NA), # IRR Poland
+                      NA, # IRR Poland, Poznan 
+                      NA),# IRR China, Shanxi
          "REG.X" = c(1201, # *Algeria, S?tif (2003-2007)
                      80002, # Uganda, Kyadondo county (2003-2007)
                      18800, #  Costa Rica (2003-2007)
-                     17001, #Colombia, Cali (2003-2007)
-                     #17002, # Colombia, Bucaramanga (2003-2007)
+                     17002, # Colombia, Bucaramanga (2003-2007)
                      15615,	#China, Harbin City, Nangang District (2003-2007) (NOT the correct district, not available)
                      35611,	# India, Dindigul, Ambilikkai (2003-2007) 
+                     36403,	# Iran (Islamic Republic of), Golestan Province (2005-2007)
                      41002, # Republic of Korea, Busan (2003-2007)
                      NA, #  NO Viet Nam, Ho Chi Minh City (2009-2012)
                      76405, # Thailand, Lampang (2003-2007)
@@ -121,15 +133,15 @@ info <- info %>%
                      15203, # *Chile, Region of Antofagasta (2003-2007)
                      38008,	# Italy, Turin (2003-2007
                      52800, # The Netherlands (2003-2007)
-                     61602), # Poland, Lower Silesia (2003-2007)   
-                     #61601), # Poland, Cracow (2003-2006) (!NOT Warsawa, largest in this volume) 
+                     61607, # Poland, Kielce (2003-2007)  
+                     15606),#China, Cixian County (2003-2007) 
          "REG.XI" = c(101200199, # *Algeria, S?tif (2008-2011)
                       180000299, # *Uganda, Kyadondo County (2008-2012)
                       218800099, #  Costa Rica (2008-2011)
-                      217000199, # Colombia, Cali (2008-2012)
-                      #217000299, # Colombia, Bucaramanga (2008-2012)
+                      217000299, # Colombia, Bucaramanga (2008-2012)
                       415608399, # China, Shenyang (2008-2012)
                       435601199, # *India, Dindigul, Ambilikkai (2008-2012)
+                      436400399, # Iran (Islamic Republic of), Golestan Province (2008-2011)
                       441000299, # Republic of Korea, Busan (2008-2012)
                       470400299, # *Viet Nam, Ho Chi Minh City (2009-2012)
                       476400599, # Thailand, Lampang (2008-2012)
@@ -140,11 +152,10 @@ info <- info %>%
                       215200399, # *Chile, Region of Antofagasta (2008-2010)
                       538000899, # Italy, Turin (2008-2012)
                       552800099, # *The Netherlands (2008-2012)
-                      561600299)) %>% #Poland, Lower Silesia (2008-2012)
-                      #561601099)) %>%  # Poland, Poznan (2008-2012)(!NOT Warsawa, largest in this volume))
+                      561600799, #Poland, Kielce (2008-2012)
+                      415600699)) %>% # China, Cixian County (2008-2012)
   separate(stY, into = paste0("stY", c(0, "")))
-info$stY[info$cid %in% c(8, 9, 13, 3, 17, 18, 4, 20, 22)] <- c(2005, 2004, 1997, 1998, 2000, #2000, 
-                                                               2003, 2002, 2006) # filling NA if only one study year
+info$stY[info$cid %in% c(8, 9, 13, 3, 17, 4, 20, 22, 71)] <- c(2005, 2004, 1997, 1998, 2000, 2003, 2002, 2006, 2004) # filling NA if only one study year
 info
 
 fact.lbl <- c("[15,20)", "[20,25)", "[25,30)", "[30,35)", "[35,40)", "[40,45)", "[45,50)", "[50,55)",
@@ -379,10 +390,10 @@ prev.data <- rbind(prev.data, cdata, clmbdata)
 
 
 pooled.hrisk <- prev.data %>%
+  filter(betag == 1) %>%
   select(sgcentre, sgid, sga3, Hrisk) %>%
   filter(sgcentre %in% info$sgcentre) %>%
   filter(sga3 >= minp &  sga3 < maxp) %>%
-  filter(betag == 1) %>%
   filter(!is.na(sga3))
 prvl <- pooled.hrisk %>%
   mutate(hpvpos = rowSums(pooled.hrisk[, Hrisk])) %>% # number of different hpv infections
@@ -897,10 +908,20 @@ ggplot(cum_prob, aes(x = AgeGroup, y = pred)) +
        y = "cumulative incidence probablity HPV")
 
 
-### plot transition
+#### mixed model graph ####
 leg <- cowplot::get_legend(ggout$tr_plot$`20_29`)
-parr10y <- cowplot::plot_grid(ggout$tr_plot$`20_29` + theme(legend.position = "none"), 
-                              ggout$tr_plot$`25_34` + theme(legend.position = "none"),
+cowplot::plot_grid(ggout$tr_plot$`20_29` + theme(legend.position = "none"), 
                               ggout$tr_plot$`30_39`+ theme(legend.position = "none"), 
-                              ggout$tr_plot$`35_44` + theme(legend.position = "none"))
-gg10y <- cowplot::plot_grid(parr10y, leg, rel_widths = c(0.8, 0.2))
+                              ggout$tr_plot$`40_49` + theme(legend.position = "none"),
+                              leg,
+                              nrow = 2)
+cowplot::plot_grid(ggout$tr_plot$`20_24` + theme(legend.position = "none"), 
+                   ggout$tr_plot$`25_29`+ theme(legend.position = "none"), 
+                   ggout$tr_plot$`30_34` + theme(legend.position = "none"),
+                   leg,
+                   nrow = 2)
+cowplot::plot_grid(ggout$tr_plot$`35_39` + theme(legend.position = "none"), 
+                   ggout$tr_plot$`40_44`+ theme(legend.position = "none"), 
+                   ggout$tr_plot$`45_49` + theme(legend.position = "none"),
+                   leg,
+                   nrow = 2)
