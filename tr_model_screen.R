@@ -1283,9 +1283,9 @@ summary(tr_lcmm)
 DpC_df <- rbind(DpCout$DpC20_24, 
                 DpCout$DpC25_29,
                 DpCout$DpC30_34, 
-                DpCout$DpC34_39)
-                #DpCout$DpC40_44,
-                #DpCout$DpC45_49)
+                DpCout$DpC34_39,
+                DpCout$DpC40_44,
+                DpCout$DpC45_49)
 
 DpC_df$ag <- factor(DpC_df$ag, levels = c("20_24", "25_29", "30_34", "35_39", "40_44", "45_49"), 
                     labels = c("20-24", "25-29", "30-34", "35-39", "40-44", "45-49"))
@@ -1298,16 +1298,16 @@ ggplot(DpC_df, aes(YsncS, log_tr)) +
 
 
 # categorical testing
-DpC_df$ag <- factor(DpC_df$ag, levels = c("20_24", "25_29", "30_34", "35_39"), 
-                    labels = c(1:4))
+DpC_df$ag <- factor(DpC_df$ag, levels = c("20_24", "25_29", "30_34", "35_39", "40_44", "45_49"), 
+                    labels = c(1:6))
 tr_c <- lcmm(log_tr ~ YsncS*cov + YsncS*ag, random = ~ YsncS, subject = "Location",  ng = 1, 
                 data = DpC_df, link = "3-equi-splines")
 
 tr_1 <- lcmm(log_tr ~ YsncS*ag, subject = "Location",  ng = 1, 
-                data = DpC_df[DpC_df$cov == 1, ], link = "4-equi-splines")
+                data = DpC_df[DpC_df$cov == 1, ], link = "splines")
 
-tr_2<- lcmm(log_tr ~ YsncS* ag, random = ~ YsncS, subject = "Location",  ng = 1, 
-                data = DpC_df[DpC_df$cov == 2, ], link = "4-equi-splines")
+tr_2<- lcmm(log_tr ~ YsncS * ag, random = ~ YsncS, subject = "Location",  ng = 1, 
+                data = DpC_df[DpC_df$cov == 2, ], link = "splines", maxiter = 200)
 
 
 ## trend testing
