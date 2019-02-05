@@ -1,0 +1,169 @@
+
+
+---
+title: "Testing with 1y-age group model for ICC in HPV+"
+author: "Rosa Schulte-Frohlinde"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## Explaining variance by proxies for HPV exposure before age 23 using age at first marriage from UN data
+
+``` {r echo = FALSE, eval = TRUE}
+
+library(haven)
+library(Epi)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(lcmm)
+
+#### proxy HPV exposure before age 20
+marriage <- read.csv("C:/Users/schultefrohlinder/Documents/R/NatHistHPV/data sets/mean_marriage_age_UN.csv", header = TRUE)
+age_MARR <- marriage %>%
+  filter(Subgroup == "Female", 
+         Country.or.Area %in% info_tr$country) %>%
+  transmute("marr_age" = Value,
+            "country" = Country.or.Area)
+age_MARR$country <- factor(age_MARR$country, levels = levels(as.factor(info_tr$country)))
+
+# korea no data on age of first marriage (or iran or vietnam, which are both not included in cohorts anyway)
+# http://kosis.kr/statHtml/statHtml.do?orgId=101&tblId=DT_1B83A05&vw_cd=&list_id=&scrId=&seqNo=&lang_mode=ko&obj_var_id=&itm_id=&conn_path=K1&path=
+age_MARR[13, "marr_age"] <- 30.2
+age_MARR[13, "country"] <- "Republic of Korea"
+#----------
+
+intercourse <- read.csv("C:/Users/schultefrohlinder/Documents/R/NatHistHPV/data sets/age_first_intercourse_worldbank.csv")
+age_SEX <- intercourse %>%
+  filter(Country.Name %in% info_tr$country,
+         #Series.Name == "Median age at first sexual intercourse (women ages 25-49): Q5 (highest)"
+         ) %>%
+  select("country" = 3, 5:16)
+
+age_SEX$country <- factor(age_SEX$country, levels = levels(as.factor(info_tr$country)))
+# only india and Colombia have data on age of first sexual intercourse
+colnames(age_SEX) <- c("country", 1990, 2000, 2008:2017)
+
+#----------
+
+for(d in c(1)){
+  cat("\n ageint: ", d) # locating error
+  #browser()
+  for(f in c(20:49)) {
+    cat("\n age.beg: ", f)
+    mina <- f 
+    maxa <- sum(f, d)
+    
+    Dp <- data.frame(matrix(nrow = 0, ncol = 17)) # Dp = Data population (as nested in of Dpop)
+    colnames(Dp) <- colnames(Dpop)
+    
+    for(j in info_tr$cid){
+      sist <- (2012 - as.numeric(info_tr$stY[info_tr$cid == j])) # nb of years since prevalence Study
+      if(info_tr$stY[info_tr$cid == j] < 2012){ # excluding Iran (in 2014)
+        # cat("\n cid: ", j) # locating error
+        for(i in 0:sist){
+          a <- (mina+i):(maxa+i) # moving age group by one year
+          y <- as.numeric(Dpop$stY) + i # i years added to year of prev. Study
+          Dp <- rbind(Dp, Dpop[Dpop$age %in% a & Dpop$Year==y & Dpop$cid== j, ])
+        }
+      }
+    }
+    Dp <- Dp[!is.na(Dp$IR), ]
+    
+    # exculde songkla
+    #Dp <- Dp %>% filter(cid != 16)
+    
+    # Years since Prevalence Study:
+    Dp <- Dp %>%
+      mutate(YsncS = as.numeric(Dp$Year) - as.numeric(Dp$stY)) 
+    Dp_out[[stringr::str_c("Dp", mina, "_", maxa)]] <- Dp
+    #data frame DpC: cumulative rates for full cohort per country, year (not over full time period) ####
+    # Sum all cases and women of all ages (in previously selected age group) in each Year and country (location, cid)
+    
+    DpC <- Dp %>%
+      ungroup() %>%
+      group_by(Year, YsncS, cid, Location, cov) %>% 
+      summarise(Npos = sum(Npos), 
+                Nicc = sum(Nicc), 
+                prev = sum(Npos)*100/sum(PopFemale),
+                IR = sum(Nicc)*100000/sum(PopFemale), # incidence rate in whole population
+                logIR = log(sum(Nicc)/sum(PopFemale)), 
+                se = sqrt(sum(Nicc))/sum(Npos), # standard error of rates = rate^2/cases = sqrt(cases)/personyears [Esteve p. 52]
+                tr = sum(Nicc)/sum(Npos), # transition rate
+                log_tr = log(sum(Nicc)/sum(Npos)), # log transition rate
+                selog = sqrt(1/sum(Npos))) %>% # var(log(k/m)) = 1/(Rate*pyears); se(log(k/m)) = sqrt(1/k) [Esteve p. 53]
+      filter(Location != "Viet Nam")%>%
+      filter(YsncS <= 14) %>% # > 15 years of follow up only Costa Rica and Colombia. < 14years: > 5 Locations
+      mutate(ag = stringr::str_c(mina, "_", maxa))
+    
+    DpC$Location <- as.factor(DpC$Location)
+    DpC$cid <- as.factor(DpC$cid)
+    DpC[which(DpC$Nicc <= 0 | DpC$Npos <= 0 ), c("Nicc", "Npos", "log_tr", "se")] <- NA # to avoid -Inf when Nicc = 0
+    DpC <- DpC[!is.na(DpC$IR), ]
+    DpCout$uno[[mina]] <- DpC # to have all age cohort for mixed model
+    DpC <- merge(DpC, age_MARR)
+    DpCout$uno_MARR[[mina]] <- DpC #for early exposure model
+    
+    
+    ## screening coverage
+    DpC$cov <- factor(DpC$cov, levels = c(1, 2), labels = c("yes", "no"))
+    
+    
+    ####` Model ####
+    
+    # latent class mixed model
+    
+    ## log...........
+    # lcmm_out$tr_lcmm$uno[[mina]] <-
+    #   tr_lcmm_1 <- lcmm(log_tr ~ YsncS, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC[DpC$cov == "yes", ], link = "4-equi-splines")
+    # 
+    # # prediction
+    # nd <- data.frame(YsncS = 0:14)
+    # lcmm_out$tr_predu$uno[[mina]] <- 
+    #   tr_pred_1 <- predictY(tr_lcmm_1, nd, methInteg = 1, draws = TRUE)$pred
+    
+  }
+}
+
+DpC_1y <- bind_rows(DpCout$uno[20:49], .id = "column_label") 
+DpC_1y$AG <- c(as.numeric(DpC_1y$column_label) + 19)
+DpC_1y <- DpC_1y[!is.na(DpC_1y$log_tr), ]
+lcmm_1y <- lcmm(log_tr ~ YsncS*cov*AG, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC_1y, link = "4-equi-splines")
+summary(lcmm_1y)
+
+ #data.frame("pred" = as.data.frame(unlist(matrix(lcmm_out$tr_pred$uno[20:24])))[,1], "YsncS" = rep(0:14, 5), "ag" = rep(20:24, each = 15))
+
+DpC_1y_MARR <- bind_rows(DpCout$uno_MARR[20:49], .id = "column_label") 
+DpC_1y_MARR$AG <- c(as.numeric(DpC_1y_MARR$column_label) + 19)
+DpC_1y_MARR <- DpC_1y_MARR[!is.na(DpC_1y_MARR$log_tr), ]
+lcmm_1y <- lcmm(log_tr ~ YsncS*cov*AG*marr_age, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC_1y_MARR, link = "4-equi-splines")
+summary(lcmm_1y_MARR)
+```
+
+## Spain considered to offer screening with a high coverage 
+```{r echo = FALSE, eval = TRUE}
+DpC_1y_SPAIN <- DpC_1y_SPAIN[!is.na(DpC_1y_SPAIN$log_tr), ]
+DpC_1y_SPAIN[DpC_1y_SPAIN$Location == "Spain", "cov"] <- 2
+lcmm_1y_SPAIN <- lcmm(log_tr ~ YsncS*cov*AG, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC_1y_SPAIN, link = "4-equi-splines")
+summary(lcmm_1y_SPAIN)
+```
+
+
+## model without interaction term  ag,YscnS,cov
+
+```{r echo = FALSE, eval = TRUE}
+lcmm_1y_INT <- lcmm(log_tr ~ YsncS + cov + AG + YsncS*cov + YsncS*AG + cov*AG, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC_1y, link = "4-equi-splines")
+summary(lcmm_1y_INT)
+```
+
+##comparing all models  
+
+```{r echo = FALSE, eval = TRUE}
+lcmm_summary <- summarytable(lcmm_1y, lcmm_1y_SPAIN, lcmm_1y_MARR, lcmm_1y_INT)
+data.frame("Deviance" = -2*(lcmm_summary[2, 2] - lcmm_summary[1, 2])*1,
+           "p-value" = 1 - pchisq(-2*(lcmm_summary[2, 2] - lcmm_summary[1, 2]), 1))
+```
+

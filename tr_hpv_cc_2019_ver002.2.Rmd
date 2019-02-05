@@ -1,0 +1,1908 @@
+---
+title: "Age, time and the international correlation of cervical cancer (Version 005)"
+author: "Rosa Schulte-Frohlinde"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r echo = FALSE, eval = TRUE}
+knitr::opts_knit$set(root.dir = "C:/Users/schultefrohlinder/Documents/R/NatHistHPV/tr_results_2019",
+                     output.dir = "C:/Users/schultefrohlinder/Documents/R/NatHistHPV/tr_results_2019")
+knitr::opts_chunk$set(cache = TRUE, echo = FALSE, message = FALSE, fig.show = TRUE, warning = FALSE, fig.width = 16, fig.height = 12) 
+```
+
+  
+  
+# 1. Update on the internation correlation of HPV and cervical cancer    
+  
+### 1.1 Data selection    
+   
+In the first part of our study we updated the study on the international correlation  of high-risk HPV published in 2008 by Maucort-Boulch *et al.* using the most recent prevalence and incidence data.  
+Initially we considered all IARC prevalence studies and the CI5 volume XI (2008-2012).  
+For 15 Locations incidence and prevalence data were available in the same regions (Figure 1). If not, we included incidence rates from the most comparable registry in the same region or country. This concerned Spain, China an Poland.   
+The prevalence study in China, Shenzhen, was excluded as the rapidly changing demographic structure due to high migration makes incidence and prevalence estimates unreliable. In Uganda only women aged < 25 years were included in the study and could thus not be included in the analysis.  
+To match the remaining 12 IARC prevalence studies we applied older CI5 data (for Vietnam, Hanoi and Pakistan, South Karachi) or, if unavailable, the incidence estimates from globocan 2018.  
+
+
+\newpage
+
+#### Figure 1: Flow chart describing the data choice process for the update of the international correlation of high-risk HPV prevalence and cervical cancer incidence
+```{r eval = TRUE, echo = FALSE, out.width = "500px"}
+knitr::include_graphics("C:/Users/schultefrohlinder/Documents/IntCorr_Paper/graphs/data_sel_upd.jpg")
+```
+
+
+   
+
+### 1.2 Methods  
+
+```{r, eval = TRUE, echo = FALSE, warning=FALSE, message=FALSE}
+library(haven)
+library(Epi)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(stringr)
+library(lcmm)
+
+
+##################### I. info ########################
+
+# locations from registry.txt
+# spain, girona removed
+# poland: kielce as also in lower bound as warsaw but not lowest
+info <- data.frame(matrix(nrow = 29, ncol = 0))
+info <- info %>%
+  mutate("cid" = c(1,  5,  6,  8,  9, 10, 12, 13, 15,  3, 16, 17,  4, 20, 19, 22,# assigned by Rosa
+                   14, # vietnam, hanoi
+                   25,# pakistan
+                   11, # bhutan
+                   31,# mongolia
+                   34,# nepal
+                   32, # rwanda
+                   26, # mexico
+                   30, # georgia
+                   33, # Vanuatu
+                   28, # Fiji
+                   7, # Nigeria
+                   29, #Guinea
+                   71), #Shanxi
+         sgcentre = c(44, 19, 12, 23, 18, 61, 15,  2,  7,  9, 14,  3, 16, 83,  4, 41,# defined by IARC prevalence studies
+                        1, # hanoi
+                        60, # pakistan
+                        65,# bhutan
+                        25, # mongolia
+                        42,# nepal
+                        66, # Rwanda
+                        8, # Mexico
+                        45, # georgia
+                        64, # Vanuatu
+                        NA, # Fiji - not in pooled data
+                        10, # Nigeria
+                        11, #Guinea 
+                        20 ), #Shanxi
+         "stY" = c("2007-2008",  "1993-1994", "1993-1995", "2005", "2004", "2013-2014", "1999-2000", "1997", "1997-1998", 
+                   "1998", "1990-2000", "1998", 
+                   #"1998", 
+                   "2001", "2002", "1995-1998", "2006",
+                   "1997",
+                   "2004-2008",
+                   "2004-2008",
+                   "2005",
+                   "2006-2007",
+                   "2013-2014",
+                   "1996-1999",
+                   "2007",
+                   "2009-2011",
+                   "2003-2007",
+                   "1999",
+                   "2006",
+                   "2004"),
+         "loc.prev" = c("Algeria, Setif", "Costa Rica",                
+                        "Colombia, Bucaramanga","China, Shenyang","India, Dindigul, Ambilikkai",                  
+                        "Iran, Golestan Province", "Republic of Korea, Busan",   "Viet Nam, Ho Chi Minh City",                   
+                        "Thailand, Lampang","Argentina, Entre Rios Province", "Thailand, Songkhla",        
+                        "Spain, Tarragona", 
+                        #"Spain, Girona", 
+                        "Chile, Region of Antofagasta",                 
+                        "Italy, Turin", "The Netherlands", "Poland, Warsaw",
+                        "Viet Nam, Hanoi",
+                        "Pakistan, South Karachi",
+                        "Bhutan",
+                        "Mongolia, Ulanbataar",
+                        "Nepal, Bharatpur",
+                        "Rwanda, Kigali",
+                        "Mexico, Morelos State",
+                        "Georgia, Tbilisi",
+                        "Vanuatu, Port Vila",
+                        "Fiji",
+                        "Nigeria, Ibadan",
+                        "Guinea, Conakry",
+                        "China, Shanxi"),  # Prevalence STudy location
+         "country" =  c("Algeria", "Costa Rica", "Colombia", "China", "India", "Iran (Islamic Republic of)",  "Republic of Korea", "Viet Nam", "Thailand", # for mortality, population
+                        "Argentina", "Thailand", "Spain", 
+                        #"Spain", 
+                        "Chile", "Italy", "Netherlands", "Poland",
+                        "Viet Nam",
+                        "Pakistan",
+                        "Bhutan",
+                        "Mongolia",
+                        "Nepal",
+                        "Rwanda",
+                        "Mexico",
+                        "Georgia",
+                        "Vanuatu",
+                        "Fiji",
+                        "Nigeria",
+                        "Guinea",
+                        "China"),
+         "Location" = c("Algeria","Costa Rica", "Colombia", "China(Shenyang)", "India", "Iran",  "Republic of Korea", "Viet Nam", "Thailand (Lampang)",
+                        "Argentina", "Thailand (Songkla)", "Spain", 
+                        #"Spain", 
+                        "Chile", "Italy", "Netherlands", "Poland",
+                        "Viet Nam, Hanoi",
+                        "Pakistan",
+                        "Bhutan",
+                        "Mongolia",
+                        "Nepal",
+                        "Rwanda",
+                        "Mexico",
+                        "Georgia",
+                        "Vanuatu",
+                        "Fiji",
+                        "Nigeria",
+                        "Guinea",
+                        "China(Shanxi)"), # for graph
+         
+         "REGISTRY" = c(101200199, # *Algeria, S?tif (2008-2011)
+                      218800099, #  Costa Rica (2008-2011)
+                      217000299, # Colombia, Bucaramanga (2008-2012)
+                      415608399, # China, Shenyang (2008-2012)
+                      435601199, # *India, Dindigul, Ambilikkai (2008-2012)
+                      436400399, # Iran (Islamic Republic of), Golestan Province (2008-2011)
+                      441000299, # Republic of Korea, Busan (2008-2012)
+                      470400299, # *Viet Nam, Ho Chi Minh City (2009-2012)
+                      476400599, # Thailand, Lampang (2008-2012)
+                      203200599, # Argentina, Entre Rios Province (2008-2011)
+                      476400499, # Thailand, Songkhla (2008-2012)
+                      572400199, # Spain, Tarragona (2008-2012)
+                      #572401099, # Spain, Girona (2008-2012)
+                      215200399, # *Chile, Region of Antofagasta (2008-2010)
+                      538000899, # Italy, Turin (2008-2012)
+                      552800099, # *The Netherlands (2008-2012)
+                      561600799, #Poland, Kielce (2008-2012)
+                      125,# vietnam, hanoi VIII (1993 -1995)
+                      45860199, # pakistan, south Karachi IX (1998 - 2002)
+                      NA,# bhutan
+                      NA, # mongolia
+                      NA, # nepal
+                      NA, # rwanda
+                      NA, # mexico
+                      NA, # georgia
+                      NA, # Vanuatu
+                      NA, # Fiji
+                      NA, # Nigeria
+                      NA, #Guinea
+                      415600699)) %>% #China, Cixian County (2008-2012))) 
+  separate(stY, into = paste0("stY", c(0, "")))
+
+info$stY[info$cid %in% c(8, 9, 13, 3, 17, 4, 20, 22, 14, 31, 30, 7, 29, 71)] <- c(2005, 2004, 1997, 1998, 2000, 2003, 2002, 2006, 1997, 2005, 2007, 1999, 2006, 2004) # filling NA if only one study year
+info$sgcentre <- as.numeric(info$sgcentre)
+
+
+#### I.2. load all data ####
+# incidence
+dataVIII <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-VIII/CI5-VIII.csv", header = FALSE)
+files.IX <- "45860199.csv"
+pathIX <- file.path("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-IXd", files.IX)
+dataIX <- lapply(pathIX, read.csv, header = FALSE)
+#casesX <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-X/cases.csv")
+#popX <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-X/pop.csv")
+casesXI <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-XI/cases.csv")
+popXI <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-XI/pop.csv")
+# prevalence
+pooled.data <- read_dta("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/prevalence data for R codes/HPVPREV_POOL_V29-1.dta")
+
+
+
+
+########################## II. Prevalence ######################################################################
+
+
+ageintp <- 10
+minp <- 25
+maxp <- 65
+
+pooled.data <- read_dta("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/prevalence data for R codes/HPVPREV_POOL_V29-1.dta")
+
+# high: 16, 18, 31, 33, 35, 39, 45, 51, 52, 56, 58, 59, 
+# probably high: 26, 53, 66, 68, 73, 82
+Hrisk <- c("ahpv16", "ahpv18", "ahpv31","ahpv33","ahpv35","ahpv39","ahpv45", 
+           "ahpv51","ahpv52","ahpv56","ahpv58","ahpv59", "ahpv68", "ahpv73", "ahpv82") # omitted apvhrx for NA reason (?)
+
+cdata <- pooled.data %>%
+  filter(!is.na(ahpv16))%>% # dplyr calculation cannot handle NA. if ahpv16 == NA, all ahpv columns NA
+  filter(sgcentre == 19) # in costa rica all sel_paper) == 0 as np paper yet
+
+clmbdata <- pooled.data %>%
+  filter(!is.na(ahpv16))%>% 
+  filter(sgcentre == 12) %>% # colombia paper normal cyt only
+  filter(!is.na(sgid))
+
+mexdata <- pooled.data %>%
+  filter(!is.na(ahpv16))%>% 
+  filter(sgcentre == 8) %>% # mexico normal cyt only
+  filter(!is.na(sgid))
+
+orig <- info$sgcentre[info$Location != "Costa Rica" & info$Location != "Colombia" & info$Location != "Mexico" ]
+
+if(pooled.data$sgcentre %in% orig){ 
+  prev.data <- pooled.data[-which(pooled.data$sel_paper0 == 0), ]
+}
+prev.data <- rbind(prev.data, cdata, clmbdata)
+
+pooled.hrisk <- prev.data %>%
+  filter(betag == 1) %>% # exlusion if betag- (to check for good DNA condition)
+  rbind(mexdata) %>% # as no betag colum in mexdat
+  select(sgcentre, sgid, sga3, Hrisk) %>%
+  filter(sgcentre %in% info$sgcentre) %>%
+  filter(sga3 >= minp &  sga3 < maxp) %>%
+  filter(!is.na(sga3))
+prvl_iarc <- pooled.hrisk %>%
+  mutate(hpvpos = rowSums(pooled.hrisk[, Hrisk])) %>% # number of different hpv infections
+  mutate(hpvsino = ifelse(hpvpos > 0, 1, 0)) %>% # factor if hpv  positive or negative for high risk types. NA now as 0 !?
+  mutate(hpvsino = factor(hpvsino, levels = c(0, 1), labels = c("neg", "pos"))) %>%
+  mutate(age.grp = factor(cut(sga3, seq(minp, maxp, ageintp), right = FALSE), labels = stringr::str_c("ag", 1:((maxp-minp)/ageintp), collapse = NULL))) %>%
+  filter(!is.na(hpvsino)) %>%
+  filter(!is.na(sgcentre)) %>%
+  ungroup() %>%
+  group_by(sgcentre, age.grp) %>%
+  summarise(prev = sum(hpvsino == "pos")/n(), 
+            se = round(sqrt((sum(hpvsino == "pos")/n())*((1-sum(hpvsino == "pos")/n()))/n()), 4),
+            n = n(),
+            c = sum(hpvsino == "pos")) %>%
+  # filter(c >= 5) %>% # to make sure estimates and standard errors are reliable
+  full_join(., info, by = "sgcentre")
+
+
+## Fiji
+fiji.data <- read_dta("C:/Users/schultefrohlinder/Documents/HPV_Prevalence/Data/Fiji/HPVPrev_FIJI.dta")
+#head(fiji.data)
+Hrisk <- c("HPV16", "HPV18", "HPV31","HPV33","HPV35","HPV39","HPV45", 
+           "HPV51","HPV52","HPV56","HPV58","HPV59", "HPV68", "HPV73", "HPV82")
+
+fiji.data[which(is.na(fiji.data[, Hrisk])), Hrisk] <- 0
+prvl_iarc <- fiji.data %>%
+  mutate(hpvpos = rowSums(fiji.data[, Hrisk])) %>% # number of different hpv infections
+  mutate(hpvsino = ifelse(hpvpos > 0, 1, 0)) %>% # factor if hpv  positive or negative for high risk types. NA now as 0 !?
+  mutate(hpvsino = factor(hpvsino, levels = c(0, 1), labels = c("neg", "pos"))) %>%
+  mutate(age.grp = factor(cut(Q_Age, seq(minp, maxp, ageintp), right = FALSE), labels = stringr::str_c("ag", 1:((maxp-minp)/ageintp), collapse = NULL))) %>%
+  filter(!is.na(hpvsino)) %>%
+  filter(Q_Age >= minp &  Q_Age < maxp) %>%
+  ungroup() %>%
+  group_by(age.grp) %>%
+  summarise(prev = sum(hpvsino == "pos")/n(), 
+            n = n(),
+            c = sum(hpvsino == "pos"),
+            se = round(sqrt((sum(hpvsino == "pos")/n())*((1-sum(hpvsino == "pos")/n()))/n()), 4)) %>%
+  mutate(cid = 28) %>%
+  # filter(c >= 5) %>% # to make sure estimates and standard errors are reliable
+  left_join(., info, by = "cid") %>%
+  union(., prvl_iarc)
+
+#prev_upd <- prvl_iarc %>%
+#  spread(., age.grp, prev) %>%
+#  select(Location, stY, age.grp, prev)
+
+############################ III. Incidence #########################################################
+
+#### III.1. inc: ci5-xi ####
+# exctract incidence count ###
+cases <- read.csv("C:/Users/schultefrohlinder/Documents/CI5-XI/cases.csv")
+pyears <- read.csv("C:/Users/schultefrohlinder/Documents/CI5-XI/pop.csv")
+
+cases <- cases %>%
+  filter(REGISTRY %in% info$REGISTRY)%>%
+  filter(SEX == 2) %>% # females
+  filter(CANCER == 32) %>% # cervical cancer
+  select(c(1, 10:17))  # age grps 
+Ni <- merge(cases, info[, c("cid", "REGISTRY")], by = "REGISTRY")
+l <- dim(Ni)[1]
+Ni <- Ni %>%
+  select(-REGISTRY) %>%
+  gather("agN", "N", 1:8) %>%
+  mutate(age.grp = rep(c("ag1", "ag2", "ag3", "ag4"), each = l*2)) %>%
+  select(-agN)
+# extract person years ###
+pyears <- pyears  %>%
+  filter(REGISTRY %in% info$REGISTRY)%>%
+  filter(SEX == 2) %>% # females
+  select(c(1, 9:16)) # age grps (7-3 = 4, 4*5 = 20. > 20y & <= 80 y)
+Pi <- merge(pyears, info[, c("cid", "REGISTRY")], by = "REGISTRY")
+l <- dim(Pi)[1]
+Pi <- Pi %>%
+  select(-REGISTRY) %>%
+  gather("agP", "P", 1:8) %>%
+  mutate(age.grp = rep(c("ag1", "ag2", "ag3", "ag4"), each = l*2))%>%
+  select(-agP)
+
+# inc: merged cases and pyears table ###
+inc <- merge(Ni, Pi) # not by sgcentre as confusion when one centre twice (eg. spain = 3)
+inc <- inc %>%
+  ungroup() %>%
+  group_by(age.grp, cid) %>%
+  summarise("Ni" = last(cumsum(N)),
+            "Pi" = last(cumsum(P)),
+            "IR" = last(cumsum(N))*100000/last(cumsum(P)))
+
+inc <- merge(inc, info)
+
+
+
+#### III.2. inc 2: CI5 VIII-IX ####
+
+# Viet Nam, Hanoi
+incVIII <- dataVIII %>%
+  filter(V1 == 125) %>% 
+  filter(V2 == 2 & V3 == 120 & V4 >= 6 & V4 <= 13) %>% # filter females, cervical cancer, age >= 5 & <= 64 (age groups here 1-19)
+  mutate("Ni" = V5, # cases
+         "Pi" = V6) %>% # personyears
+  select(Ni, Pi) %>% # drop sex, age, cases, personyears
+  mutate(age.grp = c("ag1", "ag1", "ag2", "ag2", "ag3", "ag3", "ag4", "ag4"))%>%  
+  ungroup %>%
+  group_by(age.grp) %>%
+  summarise(IR = last(cumsum(Ni))*100000/last(cumsum(Pi)),
+            Ni = last(cumsum(Ni)),
+            Pi = last(cumsum(Pi))) %>%
+  #mutate("ci5" = 8) %>%
+  mutate("Location" = c("Viet Nam, Hanoi"))  %>% # which registry exactly see Excel overview
+  mutate("cid" = c(14))
+
+
+# Pakistan, Karachi
+dataIX<- read.csv("C:/Users/schultefrohlinder/Documents/CI5-IXd/45860199.csv", head = FALSE) # transform list into data.frame
+incIX <- dataIX %>%
+  filter(V1 == 2 & V2 == 117 & V3 >= 6 & V3 <= 13) %>% # filter females, cervical cancer, age >= 25 & <= 64 (age groups here 1-19)
+  mutate("Ni" = V4,
+         "Pi" = V5) %>% # incidence rates
+  select(Ni, Pi) %>% # drop sex, age, cases, personyears
+  mutate(age.grp = c("ag1", "ag1", "ag2", "ag2", "ag3", "ag3", "ag4", "ag4"))%>%  
+  ungroup %>%
+  group_by(age.grp) %>%
+  summarise(IR = last(cumsum(Ni))*100000/last(cumsum(Pi)),
+            Ni = last(cumsum(Ni)),
+            Pi = last(cumsum(Pi))) %>%
+  #mutate("ci5" = 9) %>%
+  mutate("Location" = c("Pakistan"))  %>% # which registry exactly see Excel overview
+  mutate("cid" = 25)
+
+inc2 <- rbind(incVIII, incIX)
+inc2 <- merge(inc2, info, by = c("Location", "cid"))
+
+
+
+
+
+#### III.3. inc_globo: Globocan 2018 incidence estimates####
+ # download from http://gco.iarc.fr on 14/11/2018
+glob_25_34 <- read.csv("C:/Users/schultefrohlinder/Documents/R/NatHistHPV/data sets/globocan_25_34.csv", 
+                       row.names = NULL) %>%
+  mutate(age.grp = "ag1")
+glob_35_44 <- read.csv("C:/Users/schultefrohlinder/Documents/R/NatHistHPV/data sets/globocan_35_44.csv", 
+                       row.names = NULL)%>%
+  mutate(age.grp = "ag2")
+glob_45_54 <- read.csv("C:/Users/schultefrohlinder/Documents/R/NatHistHPV/data sets/globocan_45_54.csv", 
+                       row.names = NULL)%>%
+  mutate(age.grp = "ag3")
+glob_55_64 <- read.csv("C:/Users/schultefrohlinder/Documents/R/NatHistHPV/data sets/globocan_55_64.csv", 
+                       row.names = NULL)%>%
+  mutate(age.grp = "ag4")
+
+glob.data <- rbind(glob_25_34, glob_35_44, glob_45_54, glob_55_64)
+
+inc_glob <- glob.data %>%
+  select(country = row.names, IR = Crude.Rate., age.grp) %>% # shifted col names. crude rate is actually ASR 
+  filter(country %in% info$country[is.na(info$REGISTRY)]) %>%
+  mutate(Ni = IR, Pi = 100000) 
+inc_glob <- merge(inc_glob, info, by = c("country"))
+
+
+
+
+
+#### III.4. inc_iarc: all incidences ####
+ inc_iarc <- rbind(inc, inc2, inc_glob)
+
+# inc_upd <- inc_iarc %>%
+ #   spread(IR, age.grp) %>%
+ #   select(Location, stY, age.grp, IR)
+
+
+
+#### IV. inc.prev table for glm #### 
+inc.prev.upd <- merge(prvl_iarc, inc_iarc)
+inc.prev.upd$cid <- as.factor(inc.prev.upd$cid)
+inc.prev.upd$age.grp <- factor(inc.prev.upd$age.grp, levels = c("ag1", "ag2", "ag3", "ag4"), labels = c("25-34", "35-44", "45-54", "55-64"))
+inc.prev.upd$ci5 <- factor(is.na(inc.prev.upd$REGISTRY), levels = c(FALSE, TRUE), labels = c( "CI5", "Globocan 2018"))
+inc.prev.upd$prev <- inc.prev.upd$prev*100  
+#table.upd <- merge(prev_upd, inc_upd) %>%
+#  mutate("ext" = ifelse(Location %in% cum_dat, "x", "")) # must run tr_pred_lex_cum_2.pdf
+
+
+#### V. Spearman's correlation coefficient ####
+spear <- list()
+```
+
+The strength of the international correlation between high-risk HPV prevalence and cervical cancer incidence rates was assessed using the Spearman rank correlation coefficient.
+```{r echo = TRUE, eval = TRUE}
+for (i in levels(inc.prev.upd$age.grp)){
+  spear$all[[str_c(i)]] <- cor.test(x = inc.prev.upd$prev[inc.prev.upd$age.grp == i], 
+                                    y = inc.prev.upd$IR[inc.prev.upd$age.grp == i],
+                     alternative = "two.sided", 
+                     method = "spearman", 
+                     exact = FALSE)
+  }
+```
+
+```{r echo = FALSE, eval = TRUE}
+for (i in levels(inc.prev.upd$age.grp)){
+  spear$ci5[[str_c(i)]] <- cor.test(x = inc.prev.upd$prev[inc.prev.upd$age.grp == i & inc.prev.upd$ci5 == "CI5"], 
+                                    y = inc.prev.upd$IR[inc.prev.upd$age.grp == i & inc.prev.upd$ci5 == "CI5"],
+                                alternative = "two.sided", 
+                                method = "spearman", 
+                                exact = FALSE)
+  
+}
+rho_all <- as.vector(round(c(spear$all$`25-34`$estimate, 
+                   spear$all$`35-44`$estimate, 
+                   spear$all$`45-54`$estimate, 
+                   spear$all$`55-64`$estimate), 2)) 
+
+
+
+# 
+#### VI. Models ####
+
+### all in one model
+# inc.prev.upd[inc.prev.upd$prev == 0, "prev"] <- 0.000001
+# corr.glm <- glm(Ni/Pi ~ prev + prev*age.grp -1, family = poisson(link = "identity"), data = inc.prev.upd, weights = Pi)
+
+
+upd.glm <- list()
+upd.coef <- list()
+upd.p <- list()
+upd.pred <- list()
+upd.100 <- list()
+
+inc.prev.upd[inc.prev.upd$prev == 0, "prev"] <- 0.000001 # to provide correct starting values
+```
+
+
+Then a linear Poisson regression model was fitted to the aggregate data in each age group using high-risk HPV prevalence in each centre. *The regression model was fitted without an intercept term to satisfy the constraint that cervical cancer rates should be zero if the HPV prevalence is zero* (Figure 2).
+```{r echo = TRUE, eval = TRUE}
+
+inc.prev.upd[inc.prev.upd$prev == 0, "prev"] <- 0.000001 # to provide starting values
+
+# one regression model per age group
+for(i in levels(inc.prev.upd$age.grp)) {
+  nd <- data.frame("prev" = inc.prev.upd[inc.prev.upd$age.grp == i, "prev"])  
+  
+  upd.glm[[i]] <- glm(Ni/Pi~ prev -1, family = poisson(link = "identity"), 
+                                 data = inc.prev.upd[inc.prev.upd$age.grp == i,], weights = Pi)
+  
+  upd.coef[[i]] <- round(coef(upd.glm[[i]])[1]*100000, 2)
+  
+  upd.p[[i]] <- ifelse(coef(summary(upd.glm[[i]]))[,4] < 0.001, "<0.0001", ">0.0001" )
+  
+  upd.pred[[i]] <- data.frame("pred" = predict(upd.glm[[i]], nd, se.fit = TRUE)$fit*100000,
+                            "ci_u" = predict(upd.glm[[i]], nd, se.fit = TRUE)$fit*100000 
+                              + 1.96*(predict(upd.glm[[i]],nd, se.fit = TRUE)$se.fit*100000),
+                            "ci_l" = predict(upd.glm[[i]], nd, se.fit = TRUE)$fit*100000 
+                              - 1.96*(predict(upd.glm[[i]], nd, se.fit = TRUE)$se.fit*100000),
+                            "age.grp" = i, "prev" = nd)
+  }
+```
+```{r eval = F, echo = F}
+# predictions for 100% HPV prevalence to compare 
+# to age-specific transition rate from HPV to cervical cancer below
+for(i in levels(inc.prev.upd$age.grp)) {
+nd_100 <- data.frame("prev" = 100)  
+  upd.100[[i]] <- data.frame("pred" = predict(upd.glm[[i]], nd_100, se.fit = TRUE)$fit*100000,
+                            "ci_u" = predict(upd.glm[[i]], nd_100, se.fit = TRUE)$fit*100000 
+                              + 1.96*(predict(upd.glm[[i]],nd_100, se.fit = TRUE)$se.fit*100000),
+                            "ci_l" = predict(upd.glm[[i]], nd_100, se.fit = TRUE)$fit*100000 
+                              - 1.96*(predict(upd.glm[[i]], nd_100, se.fit = TRUE)$se.fit*100000),
+                            "age.grp" = i)
+  }
+upd.100
+```
+
+```{r echo = FALSE, eval = TRUE}
+upd_m <- rbind(upd.pred$`25-34`, upd.pred$`35-44`, upd.pred$`45-54`, upd.pred$`55-64`)
+upd_m$age.grp <- as.factor(upd_m$age.grp)
+
+```
+
+```{r echo = FALSE, eval = TRUE}
+
+
+
+## table overview
+# prvl_iarc$age.grp <- factor(prvl_iarc$age.grp, levels = c("ag1", "ag2", "ag3", "ag4"), labels = c("25-34", "35-44", "45-54", "55-64"))
+prvl_iarc$Year <- NA
+for(i in c(1:nrow(prvl_iarc))) {
+  if (prvl_iarc$stY0[i] != prvl_iarc$stY[i]){
+  prvl_iarc$Year[i] <- stringr::str_c(prvl_iarc$stY0[i], "-", prvl_iarc$stY[i])
+  }else{
+  prvl_iarc$Year[i] <- prvl_iarc$stY[i]
+  }
+}
+
+prvl_table <- prvl_iarc %>% 
+  ungroup() %>%
+  mutate("Prevalence" = c(round(prvl_iarc$prev*100, 1))) %>%
+  # filter(c>=5) %>%
+  select(Location, Year, Prevalence, age.grp) %>%
+  filter(!is.na(Prevalence)) %>%
+  spread(age.grp, Prevalence) 
+#%>%
+ #   select(-`<NA>`)
+n_prev <- prvl_iarc %>%
+  filter(!is.na(n)) %>%
+  ungroup() %>%
+  group_by(Location) %>%
+  summarise(n = sum(n)) %>%
+  ungroup()
+
+# inc_iarc$age.grp <- factor(inc_iarc$age.grp, levels = c("ag1", "ag2", "ag3", "ag4"), labels = c("25-34", "35-44", "45-54", "55-64"))
+
+inc_iarc$Year <- NA
+for(i in c(1:nrow(inc_iarc))) {
+  if (inc_iarc$stY0[i] != inc_iarc$stY[i]){
+  inc_iarc$Year[i] <- stringr::str_c(inc_iarc$stY0[i], "-", inc_iarc$stY[i])
+  }else{
+  inc_iarc$Year[i] <- inc_iarc$stY[i]
+  }
+}
+
+inc_table <- inc_iarc %>% 
+  ungroup() %>%
+  mutate("Incidence" = c(round(inc_iarc$IR, 1))) %>%
+  mutate("est" = ifelse(is.na(REGISTRY), "globocan 2018", "CI5")) %>%
+  filter(!is.na(Incidence)) %>%
+  select(Location, Year, Incidence, age.grp, est) %>%
+  spread(age.grp, Incidence) 
+
+corr_table <- full_join(prvl_table, inc_table, by = c("Location", "Year"))
+corr_table <- merge(n_prev, corr_table)
+
+```
+
+ 
+\newpage  
+### 1.3 Results  
+  
+  
+#### Figure 2: International correlation between cervical cancer incidence and high-risk HPV prevalence by 10-year age group.  
+The estimated spearman rank coefficients and poisson slope coefficients are specified for the respective age group.
+The black line represents the fitted Poisson model.  
+
+```{r eval = TRUE, echo = FALSE, fig.align='center', fig.height=16, fig.width=20, out.width="500px"}
+####VII. plots####
+
+options(scipen=999) # turns scientific notation off
+labels_upd <- c(`25-34` = str_c(" 25-34y
+        correlation coefficient = ", round(spear$all$`25-34`$estimate, 2), " (p = " , round(spear$all$`25-34`$p.value, 5),
+                            ")
+      slope = ", upd.coef$`25-34`, " (p = ", upd.p$`25-34`, ")"),
+            `35-44` = str_c(" 35-44y
+        correlation coefficient = ", round(spear$all$`35-44`$estimate, 2), " (p = " , round(spear$all$`35-44`$p.value, 5), 
+                            ")
+      slope = ", upd.coef$`35-44`, " (p = ", upd.p$`35-44`, ")"),
+            `45-54` = str_c(" 45-54y
+        correlation coefficient = ", round(spear$all$`45-54`$estimate, 2), " (p = " , round(spear$all$`45-54`$p.value, 5),
+                            ")
+      slope = ", upd.coef$`45-54`, " (p = ", upd.p$`45-54`, ")"),
+            `55-64` = str_c(" 55-64y 
+        correlation coefficient = ", round(spear$all$`55-64`$estimate, 2), " (p = " , round(spear$all$`55-64`$p.value, 5),
+                            ")
+      slope = ", upd.coef$`55-64`, " (p = ", upd.p$`55-64`, ")"))
+
+
+
+# cntry <- data.frame(cntry_ci5 = c(inc.prev.upd$loc.prev[inc.prev.upd$ci5 == "CI5" & inc.prev.upd$age.grp == "25-34"]),
+#                     cntry_globo = c(inc.prev.upd$loc.prev[inc.prev.upd$ci5 == "Globocan 2018" & inc.prev.upd$age.grp == "25-34"]), check.rows = FALSE)
+# 
+# inc.prev.upd$Location <- as.factor(inc.prev.upd$Location)
+# 
+
+
+### by country
+sh <- c(0:24, 1, 4, 8, 9)
+# inc.prev.upd$age.grp <- factor(inc.prev.upd$age.grp, levels = c("ag1", "ag2", "ag3", "ag4"), labels = c("25-34", "35-44", "45-54", "55-64")) 
+upd_m <- rbind(upd.pred$`25-34`, upd.pred$`35-44`, upd.pred$`45-54`, upd.pred$`55-64`)
+upd_m$age.grp <- as.factor(upd_m$age.grp)
+upd_dat <- merge(inc.prev.upd, upd_m)
+
+gg_loc <- ggplot2::ggplot(upd_dat, aes(x = prev, y = IR)) +
+  theme_classic() +
+  geom_point(aes(color = loc.prev, shape = loc.prev), size = 3) +
+  scale_shape_manual(values = sh) +
+  guides(color = guide_legend(ncol = 1),
+         shape = guide_legend(ncol = 1)) +
+  facet_wrap(~age.grp, labeller = labeller(age.grp = labels_upd), scales = "free_x") +
+  theme(strip.text.x = element_text(size = 18)) +
+  labs(x = "hrHPV prevalence (%)",
+       y = "Cervical Cancer Incidence (per 100000 women)",
+       color = "Location",
+       shape = "Location") +
+  #ylim(0, 160) +
+  xlim(0, 36) +
+  theme(legend.title = element_text(size= 22, face="bold"),
+        legend.text = element_text(size = 18),
+        legend.justification= "center",
+        #legend.position = c(0.8, 0.7),
+        legend.key.width = unit(c(1.5 ), "cm"),
+        legend.key.height = unit(c(0.8), "cm"),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 18)) +
+  geom_ribbon(aes(x = prev, ymin = ci_l, ymax = ci_u), fill = "#969696", alpha = 0.5) +
+  geom_line(aes(x = prev, y = pred), size = 1.2, col = "black")
+   # geom_smooth(method = "glm", method.args = list(family = poisson(link = "identity")), 
+   #             formula = y~x -1, aes(), color ="#252525", size = 1.5, se = TRUE, fill = "#cccccc")
+gg_loc
+```
+
+
+
+\newpage 
+# 2. Ecological estimate of the transition rate from high-risk HPV to cervical cancer  
+
+### 2.1 Methods  
+
+To estimate the transition rate from hrHPV infection to cervical cancer we followed the multistage model describing the natural history of cervical cancer, including death as competitive risk.  This allowed us to evaluate the cervical cancer incidence rate in women tested HPV+ at a certain age in the year of the prevalence study in the respective country (Figure 3). 
+
+
+
+#### Figure 3: Competitive risk model describing the natural history of cervical cancer used to estimate the transition rate  from high-risk HPV infection to cervical cancer
+```{r, eval = TRUE, echo = FALSE, out.width="500px"}
+knitr::include_graphics("C:/Users/schultefrohlinder/Documents/IntCorr_Paper/graphs/mult_stage.jpg")
+```
+
+
+
+
+```{r echo = FALSE, eval = TRUE, results= FALSE, dev.args=FALSE}
+####`1. info table ####
+# CHina, shanxi added
+# Spain, Girona removed
+# Spain in non-screening group
+
+info_tr <- data.frame(matrix(nrow = 17, ncol = 0))
+info_tr <- info_tr %>%
+  mutate("cid" = c(1,  #2,  
+                   5,  6,  8,  9, 10, 12, 13, 15,  3, 16, 17, 
+                   #18,  
+                   4, 20, 19, 22, 71), # assigned by Rosa
+         "sgcentre" = c(44, #100, 
+                        19, 12, 23, 18, 61, 15,  2,  7,  9, 14,  3,  
+                        #3, 
+                        16, 83,  4, 41, 20), # defined by IARC prevalence studies
+         "stY" = c("2007-2008", #"2002-2004", 
+                   "1993-1994", "1993-1995", "2005", "2004", "2013-2014", "1999-2000", "1997", "1997-1998", 
+                   "1998", "1990-2000", "1998", 
+                   #"1998", 
+                   "2001", "2002", "1995-1998", "2006", "2004"),
+         "loc.prev" = c("Algeria, Setif",#"Uganda, Kyadondo County", 
+                        "Costa Rica",                
+                        "Colombia, Bucaramanga","China, Shenyang","India, Dindigul, Ambilikkai",                  
+                        "Iran (Islamic Republic of), Golestan Province", "Republic of Korea, Busan",   "Viet Nam, Ho Chi Minh City",                   
+                        "Thailand, Lampang","Argentina, Entre Rios Province", "Thailand, Songkhla",        
+                        "Spain", 
+                        #"Spain, Girona", 
+                        "Chile, Region of Antofagasta",                 
+                        "Italy, Turin", "The Netherlands", "Poland, Poznan", "China, Shanxi"),  # Prevalence STudy location
+         "country" =  c("Algeria", #"Uganda", 
+                        "Costa Rica", "Colombia", "China", "India", "Iran (Islamic Republic of)",  "Republic of Korea", "Viet Nam", "Thailand", # for mortality, population
+                        "Argentina", "Thailand", "Spain", 
+                        #"Spain", 
+                        "Chile", "Italy", "Netherlands", "Poland", "China"),
+         "Location" = c("Algeria", #"Uganda", 
+                        "Costa Rica", "Colombia", "China(Shenyang)", "India", "Iran",  "Republic of Korea", "Viet Nam", "Thailand(Lampang)", # for graph
+                        "Argentina", "Thailand(Songkhla)", "Spain", 
+                        #"Spain (Girona)", 
+                        "Chile", "Italy", "Netherlands", "Poland", "China(Shanxi)"),
+         #"cov" = c(3, #3, 
+        #           3, 2, 3, 3, 3, 2, 3, 2, 2, 2, 1, 2, 1, 1, 3, 3), # three screening groups (>70%, 50-70%, <50%)
+         "cov" = c(1, #1, 
+                   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1), # 1: no screen, 2: screen
+         
+         "REG.VIII" = c(NA, # IRR Algeria, S?tif 
+                        #NA, # IRR Uganda, Kyadondo County 
+                        12, # *Costa Rica (1995-1996) prev: 1993/4
+                        11, #  Colombia, Cali (1992-1996) (NO Bucamaranga in this volume) prev: 1993/5
+                        NA, # IRR China, Shenyang 
+                        NA, # IRR India, Dindigul, Ambilikkai 
+                        NA, # IRR Iran (Islamic Republic of), Golestan Province 
+                        NA, # IRR Korea, Busan (1996-1997) 
+                        NA, # IRR Viet Nam, Ho Chi Minh City 
+                        NA, #	IRR Thailand, Lampang 
+                        NA, #	IRR Argentina, Bahia Blanca 
+                        NA, #	IRR Thailand, Songkhla 
+                        NA, #	IRR Spain, Tarragona 
+                        #NA, #	IRR Spain, Girona 
+                        NA, # Chile, Region of Antofagasta  
+                        NA, # IRR Italy, Turin 
+                        NA, # IRR The Netherlands
+                        NA, # IRR Poland, Poznan
+                        NA),# IRR China, Shanxi
+         "files.IX" = c(NA, # IRR Algeria, S?tif 
+                        #NA, # IRR Uganda, Kyadondo County 
+                        "21880099.csv", #	Costa Rica (1998-2002)
+                        "21700199.csv", # Colombia, Cali (1998-2002) (NO Bucamaranga in this volume)
+                        NA, # IRR China, Shenyang 
+                        NA, # IRR India, Dindigul, Ambilikkai 
+                        NA, # IRR Iran (Islamic Republic of), Golestan Province 
+                        "44100299.csv", #	Korea, Busan (1998-2002) 
+                        NA, # Viet Nam, Ho Chi Minh City (NO data on Viet Nam in this volume)
+                        "47640599.csv", #	Thailand, Lampang (1998-2002)
+                        "20320199.csv", #	Argentina, Bahia Blanca (1998-2002) (NO Concordia/Entre Rios Province in this volume)
+                        "47640499.csv", #	Thailand, Songkhla (1998-2002) 
+                        "57240199.csv", #	Spain, Tarragona (1998-2001)
+                        #"57241099.csv", #	Spain, Girona (1998-2002)
+                        NA, # Chile, Region of Antofagasta  (NO data for chile, prevalence study in 2001 - very close to 2002)
+                        "53800899.csv", # IRR Italy, Turin 
+                        "55280099.csv", #	The Netherlands (1998-2002)
+                        NA, # IRR Poland, Poznan 
+                        NA),# IRR China, Shanxi
+         "REG.IX" = c(NA, # IRR Algeria, S?tif 
+                      #NA, # IRR Uganda, Kyadondo County 
+                      21880099, #	Costa Rica (1998-2002)
+                      21700199, # Colombia, Cali (1998-2002) (NO Bucamaranga in this volume)
+                      NA, # IRR China, Shenyang 
+                      NA, # IRR India, Dindigul, Ambilikkai 
+                      NA, # IRR Iran (Islamic Republic of), Golestan Province 
+                      44100299, #	Korea, Busan (1998-2002) 
+                      NA, # Viet Nam, Ho Chi Minh City (NO data on Viet Nam in this volume)
+                      47640599, #	Thailand, Lampang (1998-2002)
+                      20320199, #	Argentina, Bahia Blanca (1998-2002) (NO Concordia/Entre Rios Province in this volume)
+                      47640499, #	Thailand, Songkhla (1998-2002) 
+                      57240199, #	Spain, Tarragona (1998-2001)
+                      #57241099, #	Spain, Girona (1998-2002)
+                      NA, # Chile, Region of Antofagasta  (NO data for chile, prevalence study in 2001 - very close to 2002)
+                      53800899, # Italy, Turin 
+                      55280099, #	The Netherlands (1998-2002) 
+                      NA, # IRR Poland, Poznan 
+                      NA),# IRR China, Shanxi
+         "REG.X" = c(1201, # *Algeria, S?tif (2003-2007)
+                     #80002, # Uganda, Kyadondo county (2003-2007)
+                     18800, #  Costa Rica (2003-2007)
+                     17002, # Colombia, Bucaramanga (2003-2007)
+                     15615,	#China, Harbin City, Nangang District (2003-2007) (NOT the correct district, not available)
+                     35611,	# India, Dindigul, Ambilikkai (2003-2007) 
+                     36403,	# Iran (Islamic Republic of), Golestan Province (2005-2007)
+                     41002, # Republic of Korea, Busan (2003-2007)
+                     NA, #  NO Viet Nam, Ho Chi Minh City (2009-2012)
+                     76405, # Thailand, Lampang (2003-2007)
+                     3201, # Argentina, Bahia Blanca (2003-2007) (!! NOT Concordia like Prevalence! NO Entre Rios Province in Registry) 
+                     76404, # Thailand, Songkhla (2004-2007
+                     72401, # Spain, Tarragona (2003-2007)
+                     #72410, # Spain, Girona (2003-2007)
+                     15203, # *Chile, Region of Antofagasta (2003-2007)
+                     38008,	# Italy, Turin (2003-2007
+                     52800, # The Netherlands (2003-2007)
+                     61607, # Poland, Kielce (2003-2007)
+                     #15639), #China, Yangcheng County (2003-2007) 
+                     15606), #China, Cixian County (2003-2007) 
+         "REG.XI" = c(101200199, # *Algeria, S?tif (2008-2011)
+                      #180000299, # *Uganda, Kyadondo County (2008-2012)
+                      218800099, #  Costa Rica (2008-2011)
+                      217000299, # Colombia, Bucaramanga (2008-2012)
+                      415608399, # China, Shenyang (2008-2012)
+                      435601199, # *India, Dindigul, Ambilikkai (2008-2012)
+                      436400399, # Iran (Islamic Republic of), Golestan Province (2008-2011)
+                      441000299, # Republic of Korea, Busan (2008-2012)
+                      470400299, # *Viet Nam, Ho Chi Minh City (2009-2012)
+                      476400599, # Thailand, Lampang (2008-2012)
+                      203200599, # Argentina, Entre Rios Province (2008-2011)
+                      476400499, # Thailand, Songkhla (2008-2012)
+                      572400199, # Spain, Tarragona (2008-2012)
+                      #572401099, # Spain, Girona (2008-2012)
+                      215200399, # *Chile, Region of Antofagasta (2008-2010)
+                      538000899, # Italy, Turin (2008-2012)
+                      552800099, # *The Netherlands (2008-2012)
+                      561600799, #Poland, Kielce (2008-2012)
+                      #415600899)) %>% #China, Linzhou County (2008-2012)
+                      415600699)) %>% # China, Cixian County (2008-2012)
+  separate(stY, into = paste0("stY", c(0, "")))
+info_tr$stY[info_tr$cid %in% c(8, 9, 13, 3, 17, 4, 20, 22, 71)] <- c(2005, 2004, 1997, 1998, 2000, 2003, 2002, 2006, 2004) # filling NA if only one study year
+# info_tr$cov <- factor(info_tr$cov, levels = c(1, 2, 3), labels = c("high", "medium", "low"))
+
+
+fact.lbl <- c("[15,20)", "[20,25)", "[25,30)", "[30,35)", "[35,40)", "[40,45)", "[45,50)", "[50,55)",
+              "[55,60)", "[60,65)", "[65,70)", "[70,75)", "[75,80)")
+
+####`2. load all data ####
+# mortality
+# load from mortality_rates.UN, $LocID following officially assigned ISO 3166-1 numeric codes 
+life.table <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/mortality data for R codes/UN World Population Prospects 2017/WPP2017_LifeTable.csv")
+# population 
+NP <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/population data for R codes/WPP2017_PopulationBySingleAgeSex .csv", header = TRUE)
+# incidence
+dataVIII <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-VIII/CI5-VIII.csv", header = FALSE)
+files.IX <- na.exclude(info_tr$files.IX)
+REG.IX <- na.exclude(info_tr$REG.IX)
+pathIX <- file.path("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-IXd", files.IX)
+dataIX <- lapply(pathIX, read.csv, header = FALSE)
+casesX <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-X/cases.csv")
+popX <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-X/pop.csv")
+casesXI <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-XI/cases.csv")
+popXI <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-XI/pop.csv")
+# prevalence
+pooled.data <- read_dta("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/prevalence data for R codes/HPVPREV_POOL_V29-1.dta")
+
+
+
+####`3. select age groups cohort and prevalence ####
+# for cohort, model, graph
+# mina <- 20
+# maxa <- 25
+# for prevalence
+ageintp <- 10
+minp <- 20
+maxp <- 70
+
+
+####`4. mortality ####
+
+# calculated from rates or numbers of deaths for CI??? 
+# load from mortality_rates.UN
+# life.table <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/mortality data for R codes/UN World Population Prospects 2017/WPP2017_LifeTable.csv")
+# $LocID following officially assigned ISO 3166-1 numeric codes 
+# https://esa.un.org/unpd/wpp/Download/Standard/CSV/
+mort <- life.table %>%
+  filter(Sex == "Female") %>%
+  filter(Location %in% info_tr$country) %>%
+  filter(MidPeriod %in% 1993:2013) %>%
+  mutate("mx100" = mx * 100000) %>% # deaths per 100 000 personyears
+  select(?..LocID, Location, Time, MidPeriod, AgeGrp, mx100)%>%
+  filter(AgeGrp != 0) %>%
+  filter(AgeGrp != "1-4") %>%
+  filter(AgeGrp != "5-9") %>%
+  filter(AgeGrp != "10-14") %>%
+  filter(AgeGrp != "80-84") %>%
+  filter(AgeGrp != "85+") %>%
+  spread(AgeGrp, mx100) 
+# mx: Central death rate, nmx, for the age interval (x, x+n)
+# mx100: annual deaths per 100 000 persons (in life table mx is per hypothetical person)
+colnames(mort) <- c("country", "Time", "Midperiod", "M15_19", "M20_24", "M25_29", "M30_34", "M35_39", "M40_44", "M45_49", 
+                    "M50_54", "M55_59", "M60_64", "M65_69", "M70_74", "M75_79")
+mort <- merge(mort, info_tr, by = "country", all = TRUE)
+# different time intervals than incidence -> new data frame with one row per year
+mort <- mort %>% 
+  separate(Time, into = c("Time.Start", "Time.End"))
+rowmort <- nrow(mort)
+mort <- mort[rep(1:rowmort,each=5),] # time intervals are five years, so each registry entry per ci5 must be repeated 5 times
+addyear <- rep(0:4, rowmort) # dummy variable to calculate years in each time interval
+mort$add <- addyear 
+mort$Time.Start <- as.numeric(mort$Time.Start)
+mort$Year <- mort$Time.Start + mort$add
+mort <- mort %>%
+  select(-add, - Time.Start, - Time.End)
+
+
+
+
+####`5. population ####
+# NP <- read.csv("C:/Users/schultefrohlinder/Documents/R/NatHistHPV/data sets/WPP2017_PopulationBySingleAgeSex.csv", header = TRUE)
+# NP$Age <- as.numeric(NP$AgeGrp)
+Npop <- NP %>%  # number population(age, year)
+  select(c(-1, -PopMale, -PopTotal,  - AgeGrpSpan, - AgeGrpStart)) %>%
+  filter(Location %in% info_tr$country) %>%
+  filter(Time %in% 1990:2012) %>%
+  mutate(Year = Time)  %>% # AgeGrpSpan = 1 
+  mutate(country  = Location) %>%
+  select(-Location, -Time, -VarID, - Variant)
+#Npop$Location <- factor(Npop$Location, levels = levels(info_tr$country))  
+Npop <- Npop %>%
+  full_join(., info_tr, by = c("country"))
+
+
+
+
+
+####`6. incidence ####
+
+####`CI5-VIII 1993-1997####
+#First column is population number (see population dictionary)
+#Second column is sex (1 Male/2 Female)
+#Third column is cancer number (see cancer dictionary)
+#Fourth column is age (1-19: 0-4,5-9,..,85+,unknown age)
+#Fifth column is number of cancer cases by age
+#Sixth column is person-years at risk by age
+
+# dataVIII <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-VIII/CI5-VIII.csv", header = FALSE)
+incVIII_tr <- dataVIII %>%
+  filter(V1 %in% info_tr$REG.VIII) %>%
+  filter(V2 == 2 & V3 == 120 & V4 >= 4 & V4 <= 16) %>% # filter females, cervical cancer, age >= 15 & <= 79 (age groups here 1-19)
+  mutate("V7" = round(V5 * 100000 / V6, 2)) %>% # new column with incidence rate per 100000
+  select(-V2, -V3, -V5, - V6) %>%
+  spread(V4, V7) %>%
+  mutate("ci5" = 8) %>%
+  mutate("country" = c("Colombia", "Costa Rica"))  %>% # which registry exactly see Excel overview
+  mutate("cid" = c(6, 5))
+incVIII_tr <- incVIII_tr[rep(1:2, each=5),] # one line per year as incidence time intervals differ from mortality's
+incVIII_tr$Year <- rep(1993:1997, 2)
+colnames(incVIII_tr) <- c("REG.VIII", "R15", "R20", "R25", "R30", "R35", "R40", "R45", 
+                       "R50", "R55", "R60", "R65", "R70", "R75", "ci5", "country", "cid", "Year")
+
+####`CI5-IX 1998-2002 ####`
+#First column is sex (1 male/2 female)  
+#Second column is the cancer site number (1 to 244, see "cancer.txt") 
+#Third column is age-group, 0-4,5-9,10-14,...,80-84,85+,age unknown (1 to 19)  
+#Fourth column is number of cases  
+#Fifth column is person-years at risk
+# 117 cervix uteri (C53)
+
+
+# files.IX <- na.exclude(info_tr$files.IX)
+# REG.IX <- na.exclude(info_tr$REG.IX)
+# pathIX <- file.path("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-IXd", files.IX)
+# dataIX <- lapply(pathIX, read.csv, header = FALSE)
+# all files in one list, elements of which are named by registry numbers
+names(dataIX) <- REG.IX # will be added as own column during transformation into data frame
+dataIX<- plyr::ldply(dataIX, data.frame) # transform list into data.frame
+incIX_tr <- dataIX %>%
+  filter(V1 == 2 & V2 == 117 & V3 >= 4 & V3 <= 16) %>% # filter females, cervical cancer, age >= 15 & <= 79 (age groups here 1-19)
+  mutate("V6" = round(V4*100000/V5, 2)) %>% # incidence rates
+  select("REG.IX" = .id, V3, V6, -V1, -V2, -V4, -V5) %>% # drop sex, age, cases, personyears
+  spread(V3, V6) %>% # horizontal orientation of data frame to match other volumes
+  mutate(ci5 = 9)
+incIX_tr <- merge(incIX_tr, info_tr[, c("REG.IX", "country", "cid")], by = "REG.IX")
+rowsIX <- nrow(incIX_tr)
+incIX_tr <- incIX_tr[rep(1:rowsIX, each=5),] # one line per year as incidence time intervals differ from mortality's
+incIX_tr$Year <- rep(1998:2002, rowsIX) 
+colnames(incIX_tr) <- c("REG.IX", "R15", "R20", "R25", "R30", "R35", "R40", "R45", 
+                     "R50", "R55", "R60", "R65", "R70", "R75", "ci5", "country", "cid", "Year") 
+
+####`CI5-X 2003-2007 ####
+# casesX <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-X/cases.csv")
+# popX <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-X/pop.csv")
+casesX <- casesX %>%
+  filter(REGISTRY %in% info_tr$REG.X)%>%
+  filter(SEX == 2) %>% # females
+  filter(CANCER == 32) %>% # cervical cancer
+  select(c(1, 8:20))  # age grps (upper limit of age groups: 8-4 = 4, 4*5 = 20. > 20y & <= 80 y)
+popX <- popX  %>%
+  filter(REGISTRY %in% info_tr$REG.X)%>%
+  filter(SEX == 2) %>% # females
+  select(c(1, 7:19)) # age grps (7-3 = 4, 4*5 = 20. > 20y & <= 80 y)
+
+incX_tr <- merge(casesX, popX, by = "REGISTRY") 
+dc <- dim(casesX)[2]  # length of data frame cases (so script can be run even if centres added)
+dp <- dim(popX)[2] # length of data frame pyears
+incX_tr <- data.frame(incX_tr, round(incX_tr[, 2:dc] * 100000 / incX_tr[, (dp +1 ):(2*dp-1)], 1)) # select colums with values, calculate rates
+incX_tr[, c(2:(dc), (dp+1):(2*dp-1))] <- NULL # delete cases and pyears columns
+incX_tr$REG.X <- incX_tr$REGISTRY
+incX_tr<- incX_tr %>% mutate(ci5 = 10) %>% select(-REGISTRY)
+incX_tr <- merge(incX_tr, info_tr[, c("REG.X", "country", "cid")], by = "REG.X")
+rowsX <- nrow(incX_tr)
+incX_tr <- incX_tr[rep(1:rowsX, each=5),] # one line per year as incidence time intervals differ from mortality's
+incX_tr$Year <- rep(2003:2007, rowsX) 
+colnames(incX_tr) <- c("REG.X", "R15", "R20", "R25", "R30", "R35", "R40", "R45", 
+                    "R50", "R55", "R60", "R65", "R70", "R75", "ci5", "country", "cid", "Year")
+
+####`CI5-XI 2008-2011 ####
+# casesXI <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-XI/cases.csv")
+# popXI <- read.csv("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/incidence data for R codes/CI5-XI/pop.csv")
+casesXI <- casesXI %>%
+  filter(REGISTRY %in% info_tr$REG.XI)%>%
+  filter(SEX == 2) %>% # females
+  filter(CANCER == 32) %>% # cervical cancer
+  select(c(1, 8:20))  # age grps (upper limit of age groups: 8-4 = 4, 4*5 = 20. > 20y & <= 80 y)
+popXI <- popXI  %>%
+  filter(REGISTRY %in% info_tr$REG.XI)%>%
+  filter(SEX == 2) %>% # females
+  select(c(1, 7:19)) # age grps (7-3 = 4, 4*5 = 20. > 20y & <= 80 y)
+
+incXI_tr <- merge(casesXI, popXI, by = "REGISTRY") 
+dc <- dim(casesXI)[2]  # length of data frame cases (so script can be run even if centres added)
+dp <- dim(popXI)[2] # length of data frame pyears
+incXI_tr <- data.frame(incXI_tr, round(incXI_tr[, 2:dc] * 100000 / incXI_tr[, (dp +1 ):(2*dp-1)], 1)) # select colums with values, calculate rates
+incXI_tr[, c(2:(dc), (dp+1):(2*dp-1))] <- NULL # delete cases and pyears columns
+incXI_tr$REG.XI <- incXI_tr$REGISTRY
+incXI_tr<- incXI_tr %>% mutate(ci5 = 11) %>% select(-REGISTRY)
+incXI_tr <- merge(incXI_tr, info_tr[, c("REG.XI", "country", "cid")], by = "REG.XI")
+rowsXI <- nrow(incXI_tr)
+incXI_tr <- incXI_tr[rep(1:rowsXI, each=5),] # one line per year as incidence time intervals differ from mortality's
+incXI_tr$Year <- rep(2008:2012, rowsXI) 
+colnames(incXI_tr) <- c("REGISTRY", "R15", "R20", "R25", "R30", "R35", "R40", "R45", 
+                     "R50", "R55", "R60", "R65", "R70", "R75", "ci5", "country", "cid", "Year")
+
+####`all available incidence rates from ci5 volume 9-11 ####`
+# matched with cid for locations in which hpv prevalence studies were conducted
+# intervals are filled with year under assumption that incidence constant over time interval.
+inc.ci5.all <- rbind(incVIII_tr[, 2:18], incIX_tr[, 2:18], incX_tr[,2:18], incXI_tr[,2:18], na.omit = TRUE)
+inc.ci5.all$cid <- as.numeric(inc.ci5.all$cid)
+
+
+
+####`7. prevalence ####
+# pooled.data <- read_dta("I:/Projects/International Correlation of HPV and Cervical Cancer/codes and documents/data/prevalence data for R codes/HPVPREV_POOL_V29-1.dta")
+
+Hrisk <- c("ahpv16", "ahpv18", "ahpv31","ahpv33","ahpv35","ahpv39","ahpv45", 
+           "ahpv51","ahpv52","ahpv56","ahpv58","ahpv59","ahpv68", "ahpv73", "ahpv82") # omitted apvhrx for NA reason
+cdata <- pooled.data %>%
+  filter(!is.na(ahpv16))%>% # dplyr calculation cannot handle NA. if ahpv16 == NA, all ahpv columns NA
+  filter(sgcentre ==19) 
+if(pooled.data$sgcentre != 19){ # in costa rica all sel_paper) == 0 as np paper yet
+  prev.data <- pooled.data[-which(pooled.data$sel_paper0 == 0), ]
+}
+prev.data <- rbind(prev.data, cdata)
+
+
+pooled.hrisk <- prev.data %>%
+  select(sgcentre, sgid, sga3, Hrisk) %>%
+  filter(sgcentre %in% info_tr$sgcentre) %>%
+  filter(sga3 >= minp &  sga3 < maxp)
+prvl <- pooled.hrisk %>%
+  mutate(hpvpos = rowSums(pooled.hrisk[, Hrisk])) %>% # number of different hpv infections
+  mutate(hpvsino = ifelse(hpvpos > 0, 1, 0)) %>% # factor if hpv  positive or negative for high risk types. NA now as 0 !?
+  mutate(hpvsino = factor(hpvsino, levels = c(0,1), labels = c("neg", "pos"))) %>%
+  mutate(age.grp = factor(cut(sga3, seq(minp, maxp, ageintp), right = FALSE), labels = stringr::str_c("ag", 1:((maxp-minp)/ageintp), collapse = NULL))) %>%
+  ungroup() %>%
+  group_by(sgcentre, age.grp) %>%
+  summarise(prev = sum(hpvsino == "pos")/n(), se = round(1.96*sqrt((sum(hpvsino == "pos")/n())*((1-sum(hpvsino == "pos"))/n())/n()), 4)) %>%
+  full_join(., info_tr, by = "sgcentre")
+prvl %>% filter(sgcentre == 19)
+
+
+
+prvl$age.grp <- as.factor(prvl$age.grp)
+prvl.long <- prvl[rep(1:nrow(prvl), each=ageintp),] # one line per year
+nbag <- length(levels(prvl$age.grp))
+if(nbag < 9) {
+  prvl.long$age <- c(((as.numeric(stringr::str_sub(prvl.long$age.grp, -1))-1)*ageintp + minp) + 0:(ageintp-1))
+}else{
+  prvl.long$age <- c((as.numeric(stringr::str_sub(prvl.long$age.grp, -2))*ageintp - minp) + 0:(ageintp-1))
+}
+prvl.long$Year <- as.numeric(prvl.long$stY) # to be able to join 
+prvl.long$cid <- as.numeric(prvl.long$cid)
+prvl.long$stY[prvl.long$cid == 4 ] <- 2003 # chile. as nor inc rates before 2003
+prvl.long <- prvl.long %>% select(sgcentre, age.grp, prev, se, cid, loc.prev, country, stY, Location, Year, age)
+
+
+
+
+####`8. joint table ####
+# prev.long
+prvl$age.grp <- as.factor(prvl$age.grp)
+prvl.long <- prvl[rep(1:nrow(prvl), each=ageintp),] # one line per year
+nbag <- length(levels(prvl$age.grp))
+if(nbag < 9) {
+  prvl.long$age <- c(((as.numeric(stringr::str_sub(prvl.long$age.grp, -1))-1)*ageintp + minp) + 0:(ageintp-1))
+}else{
+  prvl.long$age <- c((as.numeric(stringr::str_sub(prvl.long$age.grp, -2))*ageintp - minp) + 0:(ageintp-1))
+}
+prvl.long$Year <- as.numeric(prvl.long$stY) # to be able to join 
+prvl.long$cid <- as.numeric(prvl.long$cid)
+prvl.long$stY[prvl.long$cid == 4 ] <- 2003 # chile. as nor inc rates before 2003
+prvl.long <- prvl.long %>% select(sgcentre, prev, se, cid, stY, Year, age)
+
+# inc.long
+inc.long <- inc.ci5.all %>%
+  tidyr::gather(., "age.grp", "IR", 1:13) 
+inc.long <- inc.long[rep(1:nrow(inc.long),each=5),] # time intervals are five years, so each registry entry per ci5 must be repeated 5 times
+inc.long <- inc.long %>%
+  mutate(age = c(as.numeric(stringr::str_sub(inc.long$age.grp, 2,3)) + 0:4))
+# mort.long
+mort.long <- mort %>%
+  tidyr::gather(., "age.grp", "MR", 3:15) 
+mort.long <- mort.long[rep(1:nrow(mort.long),each=5),]
+mort.long <- mort.long %>%
+  mutate(age = c(as.numeric(stringr::str_sub(mort.long$age.grp, 2,3)) + 0:4)) %>%
+  select(sgcentre, MR, cid, Year, age)
+# Npop
+pop.long <- Npop %>%
+  mutate(age = AgeGrp) %>%
+  select(age, PopFemale, Year, cid)
+pop.long$age <- as.numeric(pop.long$age)
+# transition rate data
+  Dpop <- mort.long %>%
+  full_join(., prvl.long, by = c("cid", "age", "Year", "sgcentre")) %>% 
+  full_join(., inc.long, by = c("cid", "age", "Year")) %>%
+  full_join(., pop.long, by = c("cid", "age", "Year"))%>%
+  select(-stY) %>%
+  full_join(., info_tr[, c("sgcentre", "stY", "cid", "Location", "cov")], by = c("cid", "sgcentre"))
+
+Dpop <- Dpop[order(Dpop$cid, Dpop$Year, Dpop$age),] 
+Dpop <- Dpop[which(!is.na(Dpop$IR)), ]
+Dpop <- Dpop[which(!is.na(Dpop$sgcentre)), ]
+
+
+
+
+
+####`9. calculate Nicc, Npos, YsncS ####
+
+for (i in 1:nrow(Dpop)){
+  Dpop$PopFemale[i] <- Dpop$PopFemale[i] * 1000 # exact number of women per year and age group and country
+  Dpop$Nicc[i] <- round(Dpop$PopFemale[i] * Dpop$IR[i] *10^(-5), 1)# number of cancer cases per age and year
+  Dpop$Npos[i] <- round(Dpop$prev[i] * Dpop$PopFemale[i], 1)  # number of hpv positive women in Year of hpv study and age group
+  
+}
+
+for(i in 1:(nrow(Dpop))){
+  if(!is.na(Dpop$Npos[i])) {
+    a <- Dpop$age[i]
+    y <- Dpop$Year[i]
+    loc <- Dpop$cid[i]
+    Dpop$Npos[Dpop$age == (a+1) & Dpop$Year == (y+1) & Dpop$cid == loc] <- round(Dpop$Npos[i] - Dpop$Npos[i]*Dpop$MR[i]*10^(-5) - Dpop$Nicc[i], 1)
+  }
+}
+
+Dpop <- Dpop[which(!is.na(Dpop$Npos)), ]
+
+
+####`10. Loop start: Extract cohort age mina - maxa in study year ####
+
+# a loop with plot and models for each age group as output
+ggout <- list()
+DpCout <- list()
+lcmm_out <- list("tr_lcmm","tr_lcmm_1","tr_lcmm_2", 
+                 "tr_bic", 
+                 "tr_pred","tr_pred_1","tr_pred_2", 
+                 "tr_lambda")
+Dp_out <- list()
+lcmm_NAT <- list()
+
+
+for(d in c(4, 9)){
+  cat("\n ageint: ", d) # locating error
+  #browser()
+  for(f in c(20, 25, 30, 35, 40, 45)) {
+    cat("\n age.beg: ", f)
+    mina <- f 
+    maxa <- sum(f, d)
+    
+    Dp <- data.frame(matrix(nrow = 0, ncol = 17)) # Dp = Data population (as nested in of Dpop)
+    colnames(Dp) <- colnames(Dpop)
+    
+    for(j in info_tr$cid){
+      sist <- (2012 - as.numeric(info_tr$stY[info_tr$cid == j])) # nb of years since prevalence Study
+      if(info_tr$stY[info_tr$cid == j] < 2012){ # excluding Iran (in 2014)
+        # cat("\n cid: ", j) # locating error
+        for(i in 0:sist){
+          a <- (mina+i):(maxa+i) # moving age group by one year
+          y <- as.numeric(Dpop$stY) + i # i years added to year of prev. Study
+          Dp <- rbind(Dp, Dpop[Dpop$age %in% a & Dpop$Year==y & Dpop$cid== j, ])
+        }
+      }
+    }
+    Dp <- Dp[!is.na(Dp$IR), ]
+    
+    # exculde songkla
+    #Dp <- Dp %>% filter(cid != 16)
+
+    # Years since Prevalence Study:
+    Dp <- Dp %>%
+      mutate(YsncS = as.numeric(Dp$Year) - as.numeric(Dp$stY)) 
+    Dp_out[[stringr::str_c("Dp", mina, "_", maxa)]] <- Dp
+    #data frame DpC: cumulative rates for full cohort per country, year (not over full time period) ####
+    # Sum all cases and women of all ages (in previously selected age group) in each Year and country (location, cid)
+
+    DpC <- Dp %>%
+      ungroup() %>%
+      group_by(Year, YsncS, cid, Location, cov) %>% 
+      summarise(Npos = sum(Npos), 
+                Nicc = sum(Nicc), 
+                prev = sum(Npos)*100/sum(PopFemale),
+                IR = sum(Nicc)*100000/sum(PopFemale), # incidence rate in whole population
+                logIR = log(sum(Nicc)/sum(PopFemale)), 
+                se = sqrt(sum(Nicc))/sum(Npos), # standard error of rates = rate^2/cases = sqrt(cases)/personyears [Esteve p. 52]
+                tr = sum(Nicc)/sum(Npos), # transition rate
+                log_tr = log(sum(Nicc)/sum(Npos)), # log transition rate
+                selog = sqrt(1/sum(Npos))) %>% # var(log(k/m)) = 1/(Rate*pyears); se(log(k/m)) = sqrt(1/k) [Esteve p. 53]
+      filter(Location != "Viet Nam")%>%
+      filter(YsncS <= 14) %>% # > 15 years of follow up only Costa Rica and Colombia. < 14years: > 5 Locations
+      mutate(ag = stringr::str_c(mina, "_", maxa))
+
+    DpC$Location <- as.factor(DpC$Location)
+    DpC$cid <- as.factor(DpC$cid)
+    DpC[which(DpC$Nicc <= 0 | DpC$Npos <= 0 ), c("Nicc", "Npos", "log_tr", "se")] <- NA # to avoid -Inf when Nicc = 0
+    DpC <- DpC[!is.na(DpC$IR), ]
+    DpCout[[stringr::str_c("DpC", mina, "_", maxa)]] <- DpC # to have all age cohort for mixed model
+    
+
+    ## screening coverage
+    DpC$cov <- factor(DpC$cov, levels = c(1, 2), labels = c("yes", "no"))
+    
+    ####` Model ####
+    
+    # latent class mixed model
+    
+    ## log...........
+  
+    lcmm_out$tr_lcmm[[stringr::str_c(mina, "_", maxa)]] <-
+      tr_lcmm <- lcmm(log_tr ~ YsncS * cov, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC, link = "4-equi-splines")
+  
+    lcmm_out$tr_lcmm[[stringr::str_c(mina, "_", maxa, "_1")]] <-
+      tr_lcmm_1 <- lcmm(log_tr ~ YsncS, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC[DpC$cov == "yes", ], link = "4-equi-splines")
+    lcmm_out$tr_lcmm[[stringr::str_c(mina, "_", maxa, "_2")]] <-
+      tr_lcmm_2 <- lcmm(log_tr ~ YsncS, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC[DpC$cov == "no", ], link = "4-equi-splines")
+    
+     # ## no log...............
+    lcmm_NAT$tr_lcmm[[stringr::str_c(mina, "_", maxa)]] <-
+      tr_NAT <- lcmm(tr ~ YsncS * cov, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC, link = "3-equi-splines")
+    lcmm_NAT$tr_lcmm[[stringr::str_c(mina, "_", maxa, "_1")]] <-
+      tr_NAT_1 <- lcmm(tr ~ YsncS, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC[DpC$cov == "yes", ], link = "3-equi-splines")
+    lcmm_NAT$tr_lcmm[[stringr::str_c(mina, "_", maxa, "_2")]] <-
+      tr_NAT_2 <- lcmm(tr ~ YsncS, random = ~ YsncS, subject = "Location",  ng = 1, data = DpC[DpC$cov == "no", ], link = "3-equi-splines")
+
+
+    # 
+    # bic
+    lcmm_out$tr_bic[[stringr::str_c(mina, "_", maxa)]] <- 
+      bic <- round(tr_lcmm$BIC, 2)
+
+    # prediction
+    nd <- data.frame(YsncS = 0:14)
+    lcmm_out$tr_pred[[stringr::str_c(mina, "_", maxa, "_1")]] <- 
+      tr_pred_1 <- predictY(tr_lcmm_1, nd, methInteg = 1, draws = TRUE)
+    lcmm_out$tr_pred[[stringr::str_c(mina, "_", maxa, "_2")]] <- 
+      tr_pred_2 <- predictY(tr_lcmm_2, nd, methInteg = 1, draws = TRUE)
+    #no log
+    lcmm_NAT$tr_pred[[stringr::str_c(mina, "_", maxa, "_1")]] <- 
+      pred_NAT_1 <- predictY(tr_NAT_1, nd, methInteg = 1, draws = TRUE)
+    lcmm_NAT$tr_pred[[stringr::str_c(mina, "_", maxa, "_2")]] <- 
+      pred_NAT_2 <- predictY(tr_NAT_2, nd, methInteg = 1, draws = TRUE)
+
+    #lambda
+    lcmm_out$tr_lambda[[stringr::str_c(mina, "_", maxa, "_1")]] <- 
+      tr_lambda_1 <- data.frame("YsncS" = tr_pred_1$times[2:15,]-0.5, 
+                              "lambda" = diff(tr_pred_1$pred[, 1]))
+    lcmm_out$tr_lambda[[stringr::str_c(mina, "_", maxa, "_2")]] <- 
+      tr_lambda_2 <- data.frame("YsncS" = tr_pred_2$times[2:15,]-0.5, 
+                              "lambda" = diff(tr_pred_2$pred[, 1]))
+        #no log
+    lcmm_NAT$lambda_NAT[[stringr::str_c(mina, "_", maxa, "_1")]] <- 
+      lambda_NAT_1 <- data.frame("YsncS" = pred_NAT_1$times[2:15,]-0.5, 
+                              "lambda" = diff(pred_NAT_1$pred[, 1]*1000)) # to rescale to per 1000 women
+    lcmm_NAT$lambda_NAT[[stringr::str_c(mina, "_", maxa, "_2")]] <- 
+      lambda_NAT_2 <- data.frame("YsncS" = pred_NAT_2$times[2:15,]-0.5, 
+                              "lambda" = diff(pred_NAT_2$pred[, 1]*1000))
+  }
+}
+```
+
+Multiplying the population and the prevalence in each age group and location yields the corresponding number of hrHPV+ women. We then used the UN population data and the CI5 incidence and UN mortality rates to estimate the number of new cancer cases and deaths per year in each age group and location.  
+Assuming that the HPV prevalence is constant in each 10-year age group, thus that new infections and clearances even out, we considered the transition rate being the number of new cancer cases in the remaining event free HPV+ population for each age group, year and location.  
+We shifted the age groups by one year every calendar year to then apply the respective time and age-specific rates. 
+  
+  
+\newpage
+``` {r echo = TRUE, eval = FALSE}
+  
+
+# YsncS = Years since HPV prevalence study
+# cid = country/location identification number
+# cov = low or high screening coverage
+# Nicc = number of cancer cases
+# Npos =  number of hrHPV positive women
+# PopFemale = female population per year and country (UN data)
+# mina - maxa: age range. seperate calculation for each age stratum
+
+DpC <- Dp %>%
+  ungroup() %>%
+  group_by(Year, YsncS, cid, Location, cov) %>%  
+  summarise(Npos = sum(Npos), 
+          Nicc = sum(Nicc), 
+          prev = sum(Npos)*100/sum(PopFemale),
+          IR = sum(Nicc)*100000/sum(PopFemale),  # incidence rate in whole population
+          logIR = log(sum(Nicc)/sum(PopFemale)), 
+          se = sqrt(sum(Nicc))/sum(Npos),        # standard error of rates =
+                                                 # Rate^2/cases=sqrt(cases)/personyears 
+          tr = sum(Nicc)/sum(Npos),              # transition rate
+          log_tr = log(sum(Nicc)/sum(Npos)),     # log transition rate
+          selog = sqrt(1/sum(Npos))) %>%         # var(log(k/m)) = 1/(Rate*pyears); 
+                                                 # se(log(k/m)) = sqrt(1/k)
+  filter(YsncS <= 14) %>%                       
+  mutate(ag = stringr::str_c(mina, "_", maxa))
+```
+    
+The primary analysis only included countries with low or unclear screening coverage as screening is expected to interfere with the natural history.   
+To then explore the effect of screening we repeated the analysis for the Netherlands and Italy. In both countries screening coverage is higher than 50% in a population-based screening program.  
+  
+We fitted a latent class mixed model for each screening and age group to describe the time trend of the transition rates since HPV detection, thus since the year of the equivalent HPV prevalence study.  
+Single-class quadratic I-splines with a random effect on intercept and slope were selected the best fitting model through the Bayesian Information Criterion using the lcmm package in R.  
+The follow-up was restricted to 14 years to assure a minimum of three locations when estimating the natural transition rate without screening.   
+The number of knots in the link function was fixed to a maximum of 4 to guarantee sufficient data points between the knots. 
+  
+  
+```{r, eval = TRUE,  echo = FALSE, dev.args=FALSE, results= FALSE}
+DpC20 <- DpCout$DpC20_24 %>%
+  mutate(ag = 1) 
+DpC25 <- DpCout$DpC25_34 %>%
+  mutate(ag = 2)
+DpC35 <- DpCout$DpC35_44 %>%
+  mutate(ag = 3)
+DpC45 <- DpCout$DpC45_54 %>%
+  mutate(ag = 4)
+
+DpC_df <- rbind(DpC20, DpC25, DpC35, DpC45)
+DpC_df$cov <- factor(DpC_df$cov, levels = c(1, 2), labels = c("no", "yes"))
+
+
+tr_all<- lcmm(log_tr ~ YsncS * ag * cov, random = ~ YsncS, subject = "Location",  ng = 1, 
+             data = DpC_df, link = "4-equi-splines")
+#summary(tr_all_10)
+tr_ag<- lcmm(log_tr ~ YsncS * ag, random = ~ YsncS, subject = "Location",  ng = 1, 
+             data = DpC_df, link = "4-equi-splines")
+
+# cov = 1 for countries with low/unknown screening coverage
+tr_no <- lcmm(log_tr ~ YsncS * ag, random = ~ YsncS, subject = "Location",  ng = 1, 
+             data = DpC_df[DpC_df$cov == "no", ], link = "4-equi-splines")
+
+# cov = 2 for countries with high screening coverage (Italy, Netherlands)
+tr_sc <- lcmm(log_tr ~ YsncS * ag, random = ~ YsncS, subject = "Location",  ng = 1, 
+            data = DpC_df[DpC_df$cov == "yes", ], link = "4-equi-splines")
+
+
+```  
+
+Figure 4 and 5 show the estimated transition rates and predicted overall time trend of the transition rate from hr-HPV detection to cervical cancer using the lcmm package in R. The respective code is shown here.  
+```{r, eval = FALSE, echo = TRUE, dev.args=FALSE, results = FALSE}
+
+# model fit for countries with low or unclear screening coverage
+tr_lcmm_1 <- lcmm(log_tr ~ YsncS, random = ~ YsncS, subject = "Location",  ng = 1, 
+             data = DpC[DpC$cov == "no", ], link = "4-equi-splines")
+  
+# prediction for countries with low or unclear screening coverage
+nd <- data.frame(YsncS = 0:14)
+tr_pred_1 <- predictY(tr_lcmm_1, nd, methInteg = 1, draws = TRUE)
+
+```
+  
+  
+No significant difference between the screening groups was found within the 5- and 10-year age strata *(results not shown)*.
+```{r, eval = FALSE, echo = TRUE}
+# testing for the effect of screening on the time trend of the transition rate
+tr_lcmm <- lcmm(log_tr ~ YsncS * cov, random = ~ YsncS, subject = "Location",  ng = 1, 
+                      data = DpC, link = "4-equi-splines")
+```
+   
+    
+  
+We then calculated the derivatives of the mixed models in the two screening groups (Figure 6).   
+This allows the display of the change in the transition rate over time, thus only of the change in the slope. This seems reasonable as there appears to be a large random effect on the intercept between the locations and thus the intercept depends strongly on the sample of locations. 
+``` {r echo = TRUE, eval = FALSE}
+
+# low screening
+tr_lambda_1 <- data.frame("YsncS" = tr_pred_1$times[2:15,]-0.5, 
+                              "lambda" = diff(tr_pred_1$pred[, 1]))
+
+```
+
+
+To quantify the effect of age and of screening we pooled the data over all age and screening groups and fitted a latent class linear mixed model including years since HPV study, age group and screening as covariates.   
+```{r, eval = TRUE, echo = TRUE, dev.args=FALSE, results= FALSE}
+
+# testing for the effect of age and screening on the time trend of the transition rate
+tr_all<- lcmm(log_tr ~ YsncS * ag * cov, random = ~ YsncS, subject = "Location",  ng = 1, 
+             data = DpC_df, link = "4-equi-splines")
+```
+  
+   
+     
+      
+\newpage     
+### 2.2 Results
+
+```{r eval = TRUE, echo = FALSE}
+    
+    
+### 11. data aggregation of two-group, random effect models ####
+
+
+col <- c('#d8b365', '#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c','#67001f', '#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#003c30','#b15928', '#dd1c77', '#1c9099')
+
+DpC20 <- DpCout$DpC20_24 %>%
+  mutate(ag = "ag1") 
+DpC25 <- DpCout$DpC25_34 %>%
+  mutate(ag = "ag2")
+DpC35 <- DpCout$DpC35_44 %>%
+  mutate(ag = "ag3")
+DpC45 <- DpCout$DpC45_54 %>%
+  mutate(ag = "ag4")
+
+DpC_df <- rbind(DpC20, DpC25, DpC35, DpC45)
+labels <- c(`ag1` = "20-24", `ag2` = "25-34", `ag3` = "35-44", `ag4` = "45-54")
+DpC_df$ag <- as.factor(DpC_df$ag)
+DpC_df$cov <- factor(DpC_df$cov, levels = c(1, 2), labels = c("no", "yes"))
+
+# new data 
+nd <- data.frame(YsncS = 0:14)
+
+## prediction
+pred_1 <- rbind(data.frame("tr_m" = lcmm_out$tr_pred$`20_24_1`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag1", "cov" = 1),
+                data.frame("tr_m" = lcmm_out$tr_pred$`25_34_1`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag2", "cov" = 1),
+                data.frame("tr_m" = lcmm_out$tr_pred$`35_44_1`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag3", "cov" = 1),
+                data.frame("tr_m" = lcmm_out$tr_pred$`45_54_1`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag4", "cov" = 1))
+
+pred_2 <- rbind(data.frame("tr_m" = lcmm_out$tr_pred$`20_24_2`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag1", "cov" = 2),
+                data.frame("tr_m" = lcmm_out$tr_pred$`25_34_2`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag2", "cov" = 2),
+                data.frame("tr_m" = lcmm_out$tr_pred$`35_44_2`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag3", "cov" = 2),
+                data.frame("tr_m" = lcmm_out$tr_pred$`45_54_2`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag4", "cov" = 2))
+
+pred_1$cov <- factor(pred_1$cov, levels = c(1, 2), labels = c("no", "yes"))
+pred_2$cov <- factor(pred_2$cov, levels = c(1, 2), labels = c("no", "yes"))
+
+DpC_1 <- left_join(DpC_df, pred_1, by = c("YsncS", "cov", "ag"))
+DpC_2 <- left_join(DpC_df, pred_2, by = c("YsncS", "cov", "ag"))
+DpC_12 <- rbind(DpC_1, DpC_2)
+DpC_12 <- DpC_12[!is.na(DpC_12$tr_m),]
+
+```
+  
+    
+  
+#### Figure 4: Transition rate to cervical cancer over time since high-risk HPV detection by age and screening coverage estimated using ecological data (log scale)    
+``` {r eval = TRUE, echo = FALSE}
+#### 12. Transition Plots ####
+
+#### Joint transition plot, seperate models by screening ####
+
+ticks <- c(0.1, 0.5, 2, 5, 10, 20)
+gg_12 <- ggplot(DpC_12, aes(x = YsncS, y = log_tr)) +
+  theme_minimal() +
+  geom_line(aes(col = Location, linetype = cov), size = 0.6) +
+  scale_color_manual(values = col) +
+  scale_linetype_manual(values = c(1, 3), labels = c("low screening", "high screening")) +
+  geom_line(aes(x = YsncS, y = tr_m, linetype = cov), size = 2, color = "black") +
+  facet_wrap(~ ag, labeller = labeller(ag = labels), nrow = 1) +
+  theme(strip.text.x = element_text(size = 20, face = "bold")) +
+  #geom_ribbon(aes(x = YsncS, ymin = logr_lo, ymax = logr_hi), fill = 'azure4', alpha = 0.4)+
+  labs(title = "Transition rate from HPV to cervical cancer by age and screening",
+       y = "Incidence Rate in hrHPV+ women (per 1000) on log scale", 
+       x = "Years since HPV detection",
+       subtitle = "Mixed effects model using splines. Model fit over 14y.") +
+  ylim(-10.2, -2.5)  +
+  #ylim(0, 0.02)+
+  xlim(0, 11) +
+  theme(plot.title = element_blank(),
+        plot.subtitle  = element_blank(),
+        legend.title = element_text(size = 20, face = "bold"),
+        legend.text = element_text(size = 18),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 18),
+        legend.key.height = unit(0.8, "cm"),
+        legend.key.width = unit(1.5, "cm")) + 
+  guides(linetype = guide_legend(title = "Mixed effects model"))+
+  scale_y_continuous(breaks= log(ticks/1000),  # natural scale
+                     labels= ticks)+ 
+  theme(panel.grid.minor.y =element_blank())
+
+gg_12
+
+```
+
+
+\newpage 
+#### Figure 6: The change in cervical cancer transition rate over time since high-risk HPV detection by screening coverage (log scale)
+```{r echo = FALSE, eval = TRUE}
+
+#### 13. lambda ####
+## screen
+df_g <- data.frame(lcmm_out$tr_lambda$`20_24_1`)
+df_lambda_1 <- df_g %>%
+  mutate("20_24" = lambda,
+         "25_34" = lcmm_out$tr_lambda$`25_34_1`[, 2],
+         "35_44" = lcmm_out$tr_lambda$`35_44_1`[, 2],
+         "45_54" = lcmm_out$tr_lambda$`45_54_1`[, 2]) %>%
+  select(-lambda) %>%
+  gather("AgeGroup", "lambda", 2:5) %>%
+  mutate(screen = 1)
+df_lambda_1$AgeGroup <- factor(df_lambda_1$AgeGroup, levels = c("20_24", "25_34","35_44", "45_54"),  
+                             labels = c("20-24", "25-34", "35-44", "45-54"))
+## no screen
+df_g <- data.frame(lcmm_out$tr_lambda$`20_24_2`)
+df_lambda_2 <- df_g %>%
+  mutate("20_24" = lambda,
+         "25_34" = lcmm_out$tr_lambda$`25_34_2`[, 2],
+         "35_44" = lcmm_out$tr_lambda$`35_44_2`[, 2],
+         "45_54" = lcmm_out$tr_lambda$`45_54_2`[, 2]) %>%
+  select(-lambda) %>%
+  gather("AgeGroup", "lambda", 2:5) %>%
+  mutate(screen = 2)
+df_lambda_2$AgeGroup <- factor(df_lambda_2$AgeGroup, levels = c("20_24", "25_34","35_44", "45_54"),  
+                             labels = c("20-24", "25-34", "35-44", "45-54"))
+
+df_lambda <- rbind(df_lambda_1, df_lambda_2)
+df_lambda$screen <- factor(df_lambda$screen, levels = c(1, 2), labels = c("low coverage", "high coverage"))
+
+
+## both screening types
+cols <- c('#006d2c','#66a61e','#377eb8','#7570b3','#e7298a','#d95f02')
+
+gg_lambda <- ggplot(df_lambda, aes(YsncS, lambda)) +
+  theme_classic() +
+  geom_smooth(aes(color = AgeGroup), size = 1, se = FALSE) +
+  scale_color_manual(values = cols) +
+  facet_wrap(~ screen, ncol = 2) +
+  theme(strip.text.x = element_text(size = 20, face = "bold")) +
+  labs(title = "Change in cervical cancer transition rate by screening coverage",
+       subtitle = "per woman tested hrHPV+ at a given age", 
+       x = "Years since hrHPV detection", 
+       y = "Change in cervical cancer transition rate (log scale)",
+       color = "Age at hrHPV detection",
+       linetype = "Age at hrHPV detection") + 
+  xlim(0, 14) +
+  guides(color = guide_legend(ncol = 1, label.hjust = 1)) +
+  theme(plot.title=element_text(size=24,
+                                face = "bold"),
+        plot.subtitle = element_text(size = 16),
+        plot.margin = unit(c(0.5, 0.5, 1, 1), "cm")) +
+  theme(legend.title = element_text(size=18, face="bold"),
+        legend.text = element_text(size = 18),
+        legend.justification= "center",
+        #legend.position = c(0.8, 0.7),
+        legend.key.width = unit(c(1.5 ), "cm"),
+        legend.key.height = unit(c(0.8), "cm")) +
+  theme(axis.title.x = element_text(face="bold", size=20),
+        axis.text.x  = element_text(size=18),
+        axis.title.y = element_text(face="bold", size=20),
+        axis.text.y  = element_text(size=18)) 
+
+gg_lambda
+
+
+```
+
+
+\newpage
+Using age groups as continuous variable and screening coverage as categorical variable yielded a very significant (p<0.0001) effect of age on the transition rate and its trend over time since HPV detection as well as weakly significant (p<0.1) interaction terms between screening, age and the time since HPV detection, while keeping in mind that there were only two countries in the screening group(see below). The latter is significant at p<0.05 when using 5 year age groups (data not shown).   
+Not including screening as variable yields an almost equivalent BIC *(anova is not possible with the lcmm package)*. The model including screening was thus considered preferable. 
+```{r, eval = TRUE, echo = TRUE, dev.args=FALSE, results= FALSE}
+DpC_df$ag <- as.numeric(DpC_df$ag)
+# testing for the effect of age and screening on the time trend of the transition rate 
+tr_all<- lcmm(log_tr ~ YsncS * ag * cov, random = ~ YsncS, subject = "Location",  ng = 1, 
+             data = DpC_df, link = "4-equi-splines")
+tr_ag<- lcmm(log_tr ~ YsncS * ag, random = ~ YsncS, subject = "Location",  ng = 1, 
+             data = DpC_df, link = "4-equi-splines")
+
+```
+```{r, eval = TRUE, echo = TRUE, dev.args=FALSE}
+c(tr_all$BIC, tr_ag$BIC)
+summary(tr_all) # 5/10/10/10-year age groups
+
+```
+
+# 3. Conclusion  
+In conclusion, we could confirm the strong international correlation between hr-HPV prevalence and cervical cancer incidence consistant in all age groups. The slope of the Poisson regression model rises significantly with age, suggesting that the change in cancer incidence rate per percent HPV prevalence rises with age.   
+Secondly we could observe a very significant effect of time since hr-HPV detection and age at hr-HPV detection and a small and weakly significant effect of high screening coverage on the transition rate from hr-HPV to cervical cancer estimated in this ecological study. The time trend of the transition rate stabilizes in higher age groups and earlier in countries with high screening coverage.   
+The results are consistant with previous results of *Sharma, M. et al. Using HPV prevalence to predict cervical cancer incidence. (Int. J. Cancer 2013)* and *Plummer, M. et al. Time since first sexual intercourse and the risk of cervical cancer. (Int J Cancer 2012)* while adding the aspect of time and estimating absolute numbers.
+
+
+
+\newpage
+# 4. Appendix
+#### Table 1: Contemporary high-risk HPV prevalence (%) (**n** being the total number of women included in the HPV study aged 25-64 years)
+```{r eval = TRUE, echo = FALSE, results = 'asis', warning=FALSE, message=FALSE}
+knitr::kable(merge(n_prev, prvl_table), col.names = c("Location", "n", "Study year",
+                                                     "25-34y (%)", "35-44y (%)",
+                                                     "45-54y (%)", "55-64y (%)"),
+                   align = 'c')
+#                            "Pr 45-54 (%)", "Pr 55-64 (%)",))
+#options(kableExtra.latex.load_packages = FALSE)
+# kableExtra::landscape(knitr::kable(corr_table[1:29, 1:12], 
+#                                    "latex",
+#              #caption = "Prevalence and incidence by location and age group",
+#              col.names = c("Location", "n", "Study year","Pr 25-34 (%)", "Pr 35-44 (%)" , 
+#                            "Pr 45-54 (%)", "Pr 55-64 (%)", "Incidence source",
+#                            "Inc 25-34 (/100.000)","Inc 35-44 (/100.000)" ,
+#                            "Inc 45-54 (/100.000)", "Inc 55-64 (/100.000)"),
+#              align = 'c'))
+
+```
+
+
+\newpage    
+  
+####Table 2: Most recent age-specific cervical cancer incidence rates (per 100.000 women) in countries included in the IARC HPV prevalence studies  
+
+```{r eval = TRUE, echo = FALSE, results = 'asis', warning=FALSE, message=FALSE, out.width= 9}
+knitr::kable(inc_table[, -2], col.names = c("Location", "Incidence source",
+                                                     "25-34y (/100.000)",
+                                                     "35-44y (/100.000)" ,
+                                                     "45-54y (/100.000)", 
+                                                     "55-64y (/100.000)"),
+                   align = 'c')
+
+```
+
+
+\newpage    
+  
+####Figure 7: International correlation between cervical cancer incidence and high-risk HPV prevalence by source of incidence data
+```{r eval = TRUE, echo = FALSE, fig.height=16, fig.width=20}
+# ### by source type
+
+upd_dat <- merge(inc.prev.upd, upd_m)
+
+
+gg_source <- ggplot(upd_dat, aes(x = prev, y = IR)) +
+  theme_classic() +
+  geom_point(aes(color = ci5), size = 3) +
+  scale_color_manual(values =  c('#7b3294', '#008837')) +
+  #geom_text(aes(label = cid), hjust = 1.2, vjust = 1, size = 3) +
+  facet_wrap(~age.grp, labeller = labeller(age.grp = labels_upd), scales = "free_x") +
+  theme(strip.text.x = element_text(size = 18)) +
+  guides(color = guide_legend(ncol = 1)) +
+  labs(x = "hrHPV prevalence (%)",
+       y = "Cervical Cancer Incidence (per 100 000 women)",
+       color = "Incidence data source") +
+  xlim(0, 36) +
+  theme(legend.title = element_text(size=22, face="bold"),
+        legend.text = element_text(size = 18),
+        legend.justification= "center",
+        #legend.position = c(0.8, 0.7),
+        legend.key.width = unit(c(1.5 ), "cm"),
+        legend.key.height = unit(c(0.8), "cm"),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 18))+
+  geom_line(aes(x = prev, y = pred), size = 1.5, col = "black") +
+  geom_ribbon(aes(x = prev, ymin = ci_l, ymax = ci_u), fill = "#969696", alpha = 0.5)
+  # geom_smooth(method = "glm", method.args = list(family = poisson(link = "identity")),
+              # formula = y~x -1, aes(), color ="#252525", size = 1.5, se = TRUE, fill = "#cccccc")
+
+gg_source
+```
+
+
+\newpage    
+  
+####Figure 8: International correlation between cervical cancer incidence and high-risk HPV prevalence by source using CI5 data only
+
+```{r echo = FALSE, eval = TRUE, fig.height=16, fig.width=20}
+
+rho_CI5 <- as.vector(round(c(spear$ci5$`25-34`$estimate, 
+                   spear$ci5$`35-44`$estimate, 
+                   spear$ci5$`45-54`$estimate, 
+                   spear$ci5$`55-64`$estimate), 2)) 
+
+
+
+
+#### VI. Models ####
+
+
+### one age group after the other
+#poisson
+inc.prev.upd[inc.prev.upd$prev == 0, "prev"] <- 0.000001
+
+upd.glm_CI5 <- list()
+upd.coef_CI5 <- list()
+upd.p_CI5 <- list()
+upd.pred_CI5 <- list()
+ 
+
+# one regression model per 10-year age group
+for(i in levels(inc.prev.upd$age.grp)) {
+  nd_CI5 <- data.frame("prev" = inc.prev.upd[inc.prev.upd$age.grp == i & inc.prev.upd$ci5 == "CI5", "prev"])  
+  
+  upd.glm_CI5[[i]] <- upd.glm_CI5 <- glm(Ni/Pi ~ prev -1, family = poisson(link = "identity"), data = 
+                                 inc.prev.upd[inc.prev.upd$age.grp == i & inc.prev.upd$ci5 == "CI5",], weights = Pi)
+  
+  upd.coef_CI5[[i]] <- round(coef(upd.glm_CI5[[i]])[1]*100000, 2)
+  
+  upd.p_CI5[[i]] <- ifelse(coef(summary(upd.glm_CI5[[i]]))[,4] < 0.001, "<0.0001", ">0.0001" )
+  
+  upd.pred_CI5[[i]] <- data.frame("pred" = predict(upd.glm_CI5, nd_CI5, se.fit = TRUE)$fit*100000,
+                            "ci_u" = predict(upd.glm_CI5, nd_CI5, se.fit = TRUE)$fit*100000 
+                              + 1.96*(predict(upd.glm_CI5, nd_CI5, se.fit = TRUE)$se.fit*100000),
+                            "ci_l" = predict(upd.glm_CI5, nd_CI5, se.fit = TRUE)$fit*100000 
+                              - 1.96*(predict(upd.glm_CI5, nd_CI5, se.fit = TRUE)$se.fit*100000),
+                            "age.grp" = i, "prev" = nd_CI5)
+  }
+upd_m_CI5 <- rbind(upd.pred_CI5$`25-34`, upd.pred_CI5$`35-44`, upd.pred_CI5$`45-54`, upd.pred_CI5$`55-64`)
+upd_m_CI5$age.grp <- as.factor(upd_m_CI5$age.grp)
+
+
+
+
+labels_CI5 <- c(`25-34` = str_c("25-34y
+        correlation coefficient = ", round(spear$ci5$`25-34`$estimate, 2), " (p = " , round(spear$ci5$`25-34`$p.value, 5),
+                            ")
+      slope = ", upd.coef_CI5$`25-34`, " (p = ", upd.p_CI5$`25-34`, ")"),
+            `35-44` = str_c("35-44y
+        correlation coefficient = ", round(spear$ci5$`35-44`$estimate, 2), " (p = " , round(spear$ci5$`35-44`$p.value, 5), 
+                            ")
+      slope = ", upd.coef_CI5$`35-44`, " (p = ", upd.p_CI5$`35-44`, ")"),
+            `45-54` = str_c("45-54y
+        correlation coefficient = ", round(spear$ci5$`45-54`$estimate, 2), " (p = " , round(spear$ci5$`45-54`$p.value, 5),
+                            ")
+      slope = ", upd.coef_CI5$`45-54`, " (p = ", upd.p_CI5$`45-54`, ")"),
+            `55-64` = str_c("55-64y 
+        correlation coefficient = ", round(spear$ci5$`55-64`$estimate, 2), " (p = " , round(spear$ci5$`55-64`$p.value, 5),
+                            ")
+      slope = ", upd.coef_CI5$`55-64`, " (p = ", upd.p_CI5$`55-64`, ")"))
+```
+
+```{r eval = TRUE, echo = FALSE, fig.height=16, fig.width=20}
+upd_dat_CI5 <- merge(inc.prev.upd[inc.prev.upd$ci5 == "CI5", ], upd_m_CI5)
+
+gg_loc_ci5 <- ggplot2::ggplot(upd_dat_CI5[upd_dat_CI5$ci5 == "CI5",], aes(x = prev, y = IR)) +
+  theme_classic() +
+  geom_point(aes(color = loc.prev, shape = loc.prev), size = 5) +
+  scale_shape_manual(values = sh) +
+  guides(color = guide_legend(ncol = 1),
+         shape = guide_legend(ncol = 1)) +
+  facet_wrap(~age.grp, labeller = labeller(age.grp = labels_CI5), scales = "free_x") +
+  theme(strip.text.x = element_text(size = 18)) +
+  labs(x = "hrHPV prevalence (%)",
+       y = "Cervical Cancer Incidence (per 100 000 women)",
+       color = "Location",
+       shape = "Location") +
+  # ylim(0, 115) +
+  xlim(0, 20) +
+  theme(legend.title = element_text(size=22, face="bold"),
+        legend.text = element_text(size = 18),
+        legend.justification= "center",
+        #legend.position = c(0.8, 0.7),
+        legend.key.width = unit(c(1.5 ), "cm"),
+        legend.key.height = unit(c(0.8), "cm"),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 18)) +
+  #geom_smooth(aes(x = prev, y = IR), method = "glm", formula = y~x-1, col = "black", size = 1.5)
+  geom_ribbon(aes(x = prev, ymin = ci_l, ymax = ci_u), col = "#bababa", alpha = 0.4) +
+  geom_line(aes(x = prev, y = pred), size = 1.5, col = "black")
+
+gg_loc_ci5
+```
+
+\newpage    
+  
+####Figure 9: International correlation between cervical cancer incidence and high-risk HPV prevalence on a natural scale.
+
+
+```{r echo = FALSE, eval = TRUE, fig.height=16, fig.width=20}
+## prediction
+pred_NAT_1 <- rbind(data.frame("tr_m" = lcmm_NAT$tr_pred$`20_24_1`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag1", "cov" = 1),
+                data.frame("tr_m" = lcmm_NAT$tr_pred$`25_34_1`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag2", "cov" = 1),
+                data.frame("tr_m" = lcmm_NAT$tr_pred$`35_44_1`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag3", "cov" = 1),
+                data.frame("tr_m" = lcmm_NAT$tr_pred$`45_54_1`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag4", "cov" = 1))
+pred_NAT_2 <- rbind(data.frame("tr_m" = lcmm_NAT$tr_pred$`20_24_2`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag1", "cov" = 2),
+                data.frame("tr_m" = lcmm_NAT$tr_pred$`25_34_2`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag2", "cov" = 2),
+                data.frame("tr_m" = lcmm_NAT$tr_pred$`35_44_2`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag3", "cov" = 2),
+                data.frame("tr_m" = lcmm_NAT$tr_pred$`45_54_2`$pred[,1],
+                           "YsncS" = c(0:14), "ag" = "ag4", "cov" = 2))
+
+DpC_df <- rbind(DpC20, DpC25, DpC35, DpC45)
+labels <- c(`ag1` = "20-24", `ag2` = "25-34", `ag3` = "35-44", `ag4` = "45-54")
+
+DpC_NAT_1 <- left_join(DpC_df, pred_NAT_1, by = c("YsncS", "cov", "ag"))
+DpC_NAT_2 <- left_join(DpC_df, pred_NAT_2, by = c("YsncS", "cov", "ag"))
+DpC_NAT_12 <- rbind(DpC_NAT_1, DpC_NAT_2)
+DpC_NAT_12 <- DpC_NAT_12[!is.na(DpC_NAT_12$tr_m),]
+DpC_NAT_12$cov <- factor(DpC_NAT_12$cov, levels = c(1, 2), labels = c("no", "yes"))
+DpC_NAT_12$tr_1000 <- DpC_NAT_12$tr * 1000
+DpC_NAT_12$tr_m_1000 <- DpC_NAT_12$tr_m * 1000 # rescale to per 1000 HPV+ women
+
+gg_12_NAT <- ggplot(DpC_NAT_12, aes(x = YsncS, y = tr_1000)) +
+  theme_minimal() +
+  geom_line(aes(col = Location, linetype = cov), size = 0.6) +
+  scale_color_manual(values = col) +
+  scale_linetype_manual(values = c(1, 3), labels = c("low screening", "high screening")) +
+  geom_line(aes(x = YsncS, y = tr_m_1000, linetype = cov), size = 2, color = "black") +
+  facet_wrap(~ ag, labeller = labeller(ag = labels), nrow = 1) +
+  theme(strip.text.x = element_text(size = 20, face = "bold")) +
+  #geom_ribbon(aes(x = YsncS, ymin = logr_lo, ymax = logr_hi), fill = 'azure4', alpha = 0.4)+
+  labs(title = "Transition rate from HPV to cervical cancer by age and screening",
+       y = "Incidence Rate in hrHPV+ women (per 1000) on natural scale", 
+       x = "Years since HPV detection",
+       subtitle = "Mixed effects model using splines. Model fit over 14y.") +
+  #ylim(0, 200)+
+  xlim(0, 11) +
+  theme(plot.title = element_blank(),
+        plot.subtitle  = element_blank(),
+        legend.title = element_text(size = 20, face = "bold"),
+        legend.text = element_text(size = 18),
+        axis.title = element_text(size = 20),
+        axis.text = element_text(size = 18),
+        legend.key.height = unit(0.8, "cm"),
+        legend.key.width = unit(1.5, "cm")) + 
+  guides(linetype = guide_legend(title = "Mixed effects model"))
+
+gg_12_NAT
+
+```
+
+
+
+\newpage    
+  
+####Figure 10: The change in cervical cancer transition rate over time since high-risk HPV detection by screening coverage on the natural scale
+
+```{r echo = FALSE, eval = TRUE, fig.height=16, fig.width=20}
+
+# 5y age groups: BETTER RESULTS .............................................................
+## screen
+df_g_NAT <- data.frame(lcmm_NAT$lambda_NAT$`20_24_1`)
+df_lambda_NAT_1 <- df_g_NAT %>%
+  mutate("20_24" = lambda,
+         "25_34" = lcmm_NAT$lambda$`25_34_1`[, 2],
+         "35_44" = lcmm_NAT$lambda$`35_44_1`[, 2],
+         "45_54" = lcmm_NAT$lambda$`45_54_1`[, 2]) %>%
+  select(-lambda) %>%
+  gather("AgeGroup", "lambda", 2:5)%>%
+  mutate(screen = 1) 
+df_lambda_NAT_1$AgeGroup <- factor(df_lambda_NAT_1$AgeGroup,  levels = c("20_24", "25_34","35_44", "45_54"),  
+                             labels = c("20-24", "25-34", "35-44", "45-54"))
+## no screen
+df_g_NAT <- data.frame(lcmm_NAT$lambda_NAT$`20_24_2`)
+df_lambda_NAT_2 <- df_g_NAT %>%
+  mutate("20_24" = lambda,
+         "25_34" = lcmm_NAT$lambda$`25_34_2`[, 2],
+         "35_44" = lcmm_NAT$lambda$`35_44_2`[, 2],
+         "45_54" = lcmm_NAT$lambda$`45_54_2`[, 2]) %>%
+  select(-lambda) %>%
+  gather("AgeGroup", "lambda", 2:5) %>%
+  mutate(screen = 2)
+df_lambda_NAT_2$AgeGroup <- factor(df_lambda_NAT_2$AgeGroup,  levels = c("20_24", "25_34","35_44", "45_54"),  
+                             labels = c("20-24", "25-34", "35-44", "45-54"))
+
+df_lambda_NAT <- rbind(df_lambda_NAT_1, df_lambda_NAT_2)
+df_lambda_NAT$screen <- factor(df_lambda_NAT$screen, levels = c(1, 2), labels = c("low coverage", "high coverage"))
+
+
+## both screening types
+cols <- c('#006d2c','#66a61e','#377eb8','#7570b3','#e7298a','#d95f02')
+options(scipen=999)
+
+gg_lambda_NAT <- ggplot(df_lambda_NAT, aes(YsncS, lambda)) +
+  theme_classic() +
+  geom_smooth(aes(color = AgeGroup), size = 1, se = FALSE) +
+  scale_color_manual(values = cols) +
+  facet_wrap(~ screen, ncol = 2) +
+  theme(strip.text.x = element_text(size = 20, face = "bold")) +
+  labs(title = "Change in cervical cancer transition rate by screening coverage",
+       subtitle = "per woman tested hrHPV+ at a given age", 
+       x = "Years since hrHPV detection", 
+       y = "Change in cervical cancer transition rate (per 1000 women)",
+       color = "Age at hrHPV detection",
+       linetype = "Age at hrHPV detection") + 
+  xlim(0, 14) +
+  guides(color = guide_legend(ncol = 1, label.hjust = 1)) +
+  theme(plot.title=element_text(size=24,
+                                face = "bold"),
+        plot.subtitle = element_text(size = 16),
+        plot.margin = unit(c(0.5, 0.5, 1, 1), "cm")) +
+  theme(legend.title = element_text(size=18, face="bold"),
+        legend.text = element_text(size = 18),
+        legend.justification= "center",
+        #legend.position = c(0.8, 0.7),
+        legend.key.width = unit(c(1.5 ), "cm"),
+        legend.key.height = unit(c(0.8), "cm")) +
+  theme(axis.title.x = element_text(face="bold", size=20),
+        axis.text.x  = element_text(size=18),
+        axis.title.y = element_text(face="bold", size=20),
+        axis.text.y  = element_text(size=18)) 
+
+gg_lambda_NAT
+```
